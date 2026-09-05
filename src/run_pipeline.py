@@ -11,7 +11,7 @@ import pandas as pd
 
 from src.data_cleaning import clean_movie_data
 from src.feature_engineering import build_features
-from src.train_model import train
+from src.train_model import FULL_PRE_RELEASE_FEATURES, PRE_RELEASE_FEATURES, train
 from src.evaluate_models import evaluate
 
 
@@ -65,7 +65,7 @@ def create_results_summary(metrics_path=Path("models/metrics.json"), output_path
     return output_path
 
 
-def run_pipeline():
+def run_pipeline(reduced_features=True):
     """Run cleaning, feature creation, standard training, and evaluation.
 
     Random Forest is evaluated here because it is the selected revenue model in
@@ -74,11 +74,20 @@ def run_pipeline():
     """
     clean_movie_data()
     build_features()
-    train()
-    evaluate(model_name="random_forest")
+    features = PRE_RELEASE_FEATURES if reduced_features else FULL_PRE_RELEASE_FEATURES
+    train(features=features)
+    evaluate(model_name="random_forest", features=features)
     output_path = create_results_summary()
     print(f"\nSaved organized model results to {output_path}")
 
 
 if __name__ == "__main__":
-    run_pipeline()
+    import argparse
+
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--reduced-features", action="store_true", help="Use the production 35-feature contract (default).")
+    parser.add_argument("--full-features", action="store_true", help="Use the original 38-feature contract for comparison.")
+    args = parser.parse_args()
+    if args.reduced_features and args.full_features:
+        parser.error("Choose either --reduced-features or --full-features, not both.")
+    run_pipeline(reduced_features=not args.full_features)

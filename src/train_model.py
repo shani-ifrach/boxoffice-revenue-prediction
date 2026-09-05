@@ -14,7 +14,11 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
 
-PRE_RELEASE_FEATURES = ["budget_usd", "log_budget_usd", "runtime_minutes", "release_year", "release_month", "release_season", "primary_genre", "original_language", "genre_count", "country_count", "company_count", "cast_size_top10", "is_franchise", "is_sequel", "is_summer_release", "is_holiday_release", "franchise_previous_movie_count", "franchise_previous_avg_revenue", "franchise_previous_last_revenue", "franchise_previous_max_revenue", "franchise_previous_median_revenue", "franchise_previous_success_rate", "franchise_previous_latest_success", "franchise_previous_avg_rating", "director_previous_movie_count", "director_previous_avg_revenue", "director_previous_max_revenue", "director_previous_success_rate", "director_previous_avg_rating", "production_company_previous_movie_count", "production_company_previous_avg_revenue", "production_company_previous_max_revenue", "production_company_previous_success_rate", "cast_previous_movie_count", "cast_previous_avg_revenue", "cast_previous_max_revenue", "cast_previous_success_rate", "cast_previous_avg_rating"]
+FULL_PRE_RELEASE_FEATURES = ["budget_usd", "log_budget_usd", "runtime_minutes", "release_year", "release_month", "release_season", "primary_genre", "original_language", "genre_count", "country_count", "company_count", "cast_size_top10", "is_franchise", "is_sequel", "is_summer_release", "is_holiday_release", "franchise_previous_movie_count", "franchise_previous_avg_revenue", "franchise_previous_last_revenue", "franchise_previous_max_revenue", "franchise_previous_median_revenue", "franchise_previous_success_rate", "franchise_previous_latest_success", "franchise_previous_avg_rating", "director_previous_movie_count", "director_previous_avg_revenue", "director_previous_max_revenue", "director_previous_success_rate", "director_previous_avg_rating", "production_company_previous_movie_count", "production_company_previous_avg_revenue", "production_company_previous_max_revenue", "production_company_previous_success_rate", "cast_previous_movie_count", "cast_previous_avg_revenue", "cast_previous_max_revenue", "cast_previous_success_rate", "cast_previous_avg_rating"]
+REMOVED_FEATURES = {"production_company_previous_max_revenue", "company_count", "log_budget_usd"}
+REDUCED_PRE_RELEASE_FEATURES = [feature for feature in FULL_PRE_RELEASE_FEATURES if feature not in REMOVED_FEATURES]
+# The production feature contract is now the validated 35-feature version.
+PRE_RELEASE_FEATURES = REDUCED_PRE_RELEASE_FEATURES
 CATEGORICAL_FEATURES = ["release_season", "primary_genre", "original_language"]
 
 
@@ -35,9 +39,9 @@ def make_preprocessor(features):
     ])
 
 
-def make_pipeline(estimator):
+def make_pipeline(estimator, features=PRE_RELEASE_FEATURES):
     """Combine the shared feature preprocessing with one estimator."""
-    return Pipeline([("preprocess", make_preprocessor(PRE_RELEASE_FEATURES)), ("model", estimator)])
+    return Pipeline([("preprocess", make_preprocessor(features)), ("model", estimator)])
 
 
 def regression_metrics(actual, predicted):
@@ -99,7 +103,7 @@ def add_history_from_prior_period(target, history):
     return target
 
 
-def train():
+def train(features=PRE_RELEASE_FEATURES):
     """Train, compare, and save the standard revenue and profitability models.
 
     Validation is used for model decisions and classification thresholds. After
@@ -117,7 +121,7 @@ def train():
 
     validation_data = add_history_from_prior_period(validation_data, train_data)
     test_data = add_history_from_prior_period(test_data, pd.concat([train_data, validation_data]))
-    X_train, X_validation, X_test = train_data[PRE_RELEASE_FEATURES], validation_data[PRE_RELEASE_FEATURES], test_data[PRE_RELEASE_FEATURES]
+    X_train, X_validation, X_test = train_data[features], validation_data[features], test_data[features]
     y_train_log = np.log1p(train_data["worldwide_revenue_usd"])
     y_validation_revenue, y_test_revenue = validation_data["worldwide_revenue_usd"], test_data["worldwide_revenue_usd"]
     regression_models = {"ridge": Ridge(alpha=10.0), "random_forest": RandomForestRegressor(n_estimators=400, min_samples_leaf=4, max_features=0.8, random_state=42, n_jobs=-1), "gradient_boosting": GradientBoostingRegressor(n_estimators=150, learning_rate=0.04, max_depth=2, loss="huber", random_state=42)}
@@ -126,12 +130,12 @@ def train():
     Path("models").mkdir(exist_ok=True)
 
     for name, estimator in regression_models.items():
-        validation_model = make_pipeline(estimator)
+        validation_model = make_pipeline(estimator, features)
         validation_model.fit(X_train, y_train_log)
         validation_predictions = np.maximum(0, np.expm1(validation_model.predict(X_validation)))
         factor = calibration_factor(y_validation_revenue, validation_predictions)
-        final_model = make_pipeline(estimator)
-        final_model.fit(pd.concat([train_data, validation_data])[PRE_RELEASE_FEATURES], np.log1p(pd.concat([train_data, validation_data])["worldwide_revenue_usd"]))
+        final_model = make_pipeline(estimator, features)
+        final_model.fit(pd.concat([train_data, validation_data])[features], np.log1p(pd.concat([train_data, validation_data])["worldwide_revenue_usd"]))
         test_predictions = np.maximum(0, np.expm1(final_model.predict(X_test)))
         calibrated_test_predictions = test_predictions * factor
         metrics["regression"][name] = {"calibration_factor": factor, "validation": regression_metrics(y_validation_revenue, validation_predictions), "test": regression_metrics(y_test_revenue, test_predictions), "test_calibrated": regression_metrics(y_test_revenue, calibrated_test_predictions)}
@@ -140,13 +144,13 @@ def train():
     y_train, y_validation, y_test = train_data["profitable"].astype(int), validation_data["profitable"].astype(int), test_data["profitable"].astype(int)
     combined = pd.concat([train_data, validation_data])
     for name, estimator in classification_models.items():
-        validation_model = make_pipeline(estimator)
+        validation_model = make_pipeline(estimator, features)
         validation_model.fit(X_train, y_train)
         validation_probability = validation_model.predict_proba(X_validation)[:, 1]
         thresholds = np.arange(0.30, 0.71, 0.05)
         best_threshold = max(thresholds, key=lambda threshold: f1_score(y_validation, validation_probability >= threshold, zero_division=0))
-        final_model = make_pipeline(estimator)
-        final_model.fit(combined[PRE_RELEASE_FEATURES], combined["profitable"].astype(int))
+        final_model = make_pipeline(estimator, features)
+        final_model.fit(combined[features], combined["profitable"].astype(int))
         test_probability = final_model.predict_proba(X_test)[:, 1]
         test_predictions = test_probability >= best_threshold
         metrics["classification"][name] = {"threshold": float(best_threshold), "test": classification_metrics(y_test, test_predictions, test_probability)}

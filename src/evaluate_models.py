@@ -15,7 +15,7 @@ import pandas as pd
 from src.train_model import PRE_RELEASE_FEATURES
 
 
-def evaluate(model_name="gradient_boosting", input_path=Path("data/processed/movies_features.csv")):
+def evaluate(model_name="gradient_boosting", input_path=Path("data/processed/movies_features.csv"), features=PRE_RELEASE_FEATURES):
     """Score the chronological Test period and export diagnostic tables.
 
     The input model must already be fitted. Revenue metrics are calculated in
@@ -27,7 +27,7 @@ def evaluate(model_name="gradient_boosting", input_path=Path("data/processed/mov
     # made of future release years, not a random or arbitrary row slice.
     test_data = movies[movies["release_year"] >= 2022].copy()
     model = joblib.load(f"models/regression_{model_name}.joblib")
-    test_data["predicted_revenue_usd"] = np.maximum(0, np.expm1(model.predict(test_data[PRE_RELEASE_FEATURES])))
+    test_data["predicted_revenue_usd"] = np.maximum(0, np.expm1(model.predict(test_data[features])))
     test_data["absolute_error_usd"] = (test_data["worldwide_revenue_usd"] - test_data["predicted_revenue_usd"]).abs()
     test_data["revenue_band"] = pd.cut(test_data["worldwide_revenue_usd"], bins=[-1, 250_000_000, 500_000_000, float("inf")], labels=["Regular (<$250M)", "Successful ($250M-$500M)", "Blockbuster (>$500M)"])
     Path("reports").mkdir(exist_ok=True)
