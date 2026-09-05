@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+.venv/
+.env
+data/raw/*
+data/processed/*
+models/*
+*.pbix
+.DS_Store
+*.ipynb_checkpoints/
+.idea/
+backups/
+experiments/
+*.log
