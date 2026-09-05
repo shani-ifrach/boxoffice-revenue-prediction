@@ -17,9 +17,9 @@ from src.data_cleaning import flatten_movie
 from src.train_model import PRE_RELEASE_FEATURES
 
 
-DEFAULT_HISTORY_PATH = Path("experiments/large_run/data/processed/movies_clean.csv")
-DEFAULT_REVENUE_MODEL_PATH = Path("experiments/large_run/models/regression_random_forest.joblib")
-DEFAULT_BLOCKBUSTER_MODEL_PATH = Path("experiments/large_run/models/blockbuster_400m/blockbuster_400m_classifier.joblib")
+DEFAULT_HISTORY_PATH = Path("data/processed/movies_clean.csv")
+DEFAULT_REVENUE_MODEL_PATH = Path("models/regression_random_forest.joblib")
+DEFAULT_BLOCKBUSTER_MODEL_PATH = Path("models/blockbuster_400m/blockbuster_400m_classifier.joblib")
 BLOCKBUSTER_THRESHOLD_USD = 400_000_000
 
 
