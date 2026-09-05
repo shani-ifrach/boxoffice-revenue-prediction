@@ -1,4 +1,10 @@
-"""Create actual-vs-predicted and error-by-genre tables for saved models."""
+"""Create actual-vs-predicted and segmented error tables for saved models.
+
+This module is intentionally separate from training. It makes model behavior
+visible to a reviewer by showing where errors are concentrated rather than
+reporting only one aggregate score.
+"""
+import argparse
 import json
 from pathlib import Path
 
@@ -10,6 +16,11 @@ from src.train_model import PRE_RELEASE_FEATURES
 
 
 def evaluate(model_name="gradient_boosting", input_path=Path("data/processed/movies_features.csv")):
+    """Score the chronological Test period and export diagnostic tables.
+
+    The input model must already be fitted. Revenue metrics are calculated in
+    dollar space after reversing the log-target transformation used in training.
+    """
     movies = pd.read_csv(input_path).sort_values("release_date")
     movies = movies[movies["budget_usd"].notna() & movies["profitable"].notna()].copy()
     # Keep evaluation aligned with train_model.py: the final test period is
@@ -28,5 +39,13 @@ def evaluate(model_name="gradient_boosting", input_path=Path("data/processed/mov
     print(json.dumps(json.loads(Path("models/metrics.json").read_text(encoding="utf-8")), indent=2))
 
 
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--model-name", default="random_forest", choices=["ridge", "random_forest", "gradient_boosting"])
+    parser.add_argument("--input-path", type=Path, default=Path("data/processed/movies_features.csv"))
+    args = parser.parse_args()
+    evaluate(args.model_name, args.input_path)
+
+
 if __name__ == "__main__":
-    evaluate()
+    main()

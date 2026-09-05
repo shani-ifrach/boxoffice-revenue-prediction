@@ -1,4 +1,9 @@
-"""Create leakage-aware features for analysis and modeling."""
+"""Create leakage-aware features for analysis and modeling.
+
+Features are divided conceptually into release information, production scale,
+and prior performance of related entities. Current-film outcomes are never used
+to create a predictor for that same film.
+"""
 from pathlib import Path
 
 import numpy as np
@@ -6,6 +11,17 @@ import pandas as pd
 
 
 def build_features(input_path=Path("data/processed/movies_clean.csv"), output_path=Path("data/processed/movies_features.csv")):
+    """Create the model-ready table from the cleaned movie table.
+
+    The historical aggregates use release date and a deterministic TMDB-ID
+    tie-breaker. This matters because a movie released on the same date as
+    another movie must not receive an arbitrary ordering that changes its
+    historical context between runs.
+
+    ROI and budget categories are retained for descriptive analysis, but the
+    training script excludes current-film ROI and other post-release outcomes
+    from the pre-release feature list.
+    """
     movies = pd.read_csv(input_path, parse_dates=["release_date"])
     movies["release_month"] = movies["release_date"].dt.month
     movies["release_season"] = movies["release_month"].map({12: "Winter", 1: "Winter", 2: "Winter", 3: "Spring", 4: "Spring", 5: "Spring", 6: "Summer", 7: "Summer", 8: "Summer", 9: "Fall", 10: "Fall", 11: "Fall"})

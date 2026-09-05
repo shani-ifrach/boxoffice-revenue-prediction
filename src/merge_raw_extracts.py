@@ -1,10 +1,21 @@
-"""Merge raw TMDB extracts from different sampling strategies by TMDB ID."""
+"""Merge raw TMDB extracts from different sampling strategies by TMDB ID.
+
+The merge is intentionally performed before flattening so the original TMDB
+responses remain available for auditing and for future feature changes.
+"""
 import json
 import argparse
 from pathlib import Path
 
 
 def merge_raw_extracts(raw_dir=Path("data/raw"), output_path=Path("data/raw/tmdb_movies_merged.json")):
+    """Combine extract files and keep one record per TMDB movie ID.
+
+    The same movie may be returned by multiple discover queries. TMDB's numeric
+    ID is used instead of the title because titles are not unique and may vary
+    by language or release. The output is a derived raw extract and is not
+    flattened or analytically filtered at this stage.
+    """
     records_by_id = {}
     for path in sorted(raw_dir.glob("tmdb_movies_*.json")):
         if path.name == output_path.name:

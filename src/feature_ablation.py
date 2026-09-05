@@ -1,4 +1,5 @@
 """Compare revenue-model performance after removing feature groups."""
+import argparse
 import json
 from pathlib import Path
 
@@ -52,6 +53,12 @@ def metrics(actual, predicted):
 
 
 def run_ablation(input_path=Path("data/processed/movies_features.csv")):
+    """Measure whether feature groups improve a fixed Random Forest setup.
+
+    The comparison is used for feature selection, so Validation is the primary
+    decision set. Test results are reported for transparency but are not used to
+    choose a feature set.
+    """
     movies = pd.read_csv(input_path, parse_dates=["release_date"])
     movies = movies[movies["budget_usd"].notna() & movies["worldwide_revenue_usd"].notna()].copy()
     movies = movies.sort_values("release_date")
@@ -79,5 +86,12 @@ def run_ablation(input_path=Path("data/processed/movies_features.csv")):
     print("\nSaved feature ablation results to reports/feature_ablation_results.csv")
 
 
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--input-path", type=Path, default=Path("data/processed/movies_features.csv"))
+    args = parser.parse_args()
+    run_ablation(args.input_path)
+
+
 if __name__ == "__main__":
-    run_ablation()
+    main()

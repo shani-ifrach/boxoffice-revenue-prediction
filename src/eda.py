@@ -1,5 +1,12 @@
-"""Create reproducible EDA tables, charts, and data-backed findings."""
+"""Create reproducible EDA tables, charts, and data-backed findings.
+
+EDA is descriptive rather than predictive. Revenue, ROI, votes, and popularity
+may be used here to understand historical patterns, but they must not be
+presented as pre-release inputs to the production model.
+"""
 from pathlib import Path
+
+import argparse
 
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -15,6 +22,13 @@ def save_table(data, path):
 
 
 def run_eda(input_path=Path("data/processed/movies_features.csv"), output_dir=Path("reports")):
+    """Write summary tables, charts, and a short findings file.
+
+    Group comparisons use medians where possible because a small number of
+    blockbusters creates strong right skew in revenue and ROI. Genre summaries
+    require at least 20 movies to avoid presenting unstable results from tiny
+    categories as business conclusions.
+    """
     movies = pd.read_csv(input_path)
     figures_dir = output_dir / "figures"
     figures_dir.mkdir(parents=True, exist_ok=True)
@@ -128,5 +142,13 @@ def run_eda(input_path=Path("data/processed/movies_features.csv"), output_dir=Pa
     print("EDA outputs written to", output_dir)
 
 
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--input-path", type=Path, default=Path("data/processed/movies_features.csv"))
+    parser.add_argument("--output-dir", type=Path, default=Path("reports"))
+    args = parser.parse_args()
+    run_eda(args.input_path, args.output_dir)
+
+
 if __name__ == "__main__":
-    run_eda()
+    main()

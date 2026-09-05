@@ -1,7 +1,8 @@
-"""Run the reproducible modeling pipeline and create a readable results file.
+"""Run preparation, standard modeling, evaluation, and result export.
 
-This entry point uses the raw TMDB extracts already present in ``data/raw``. It
-does not call the API again; collection remains a separate, intentional step.
+This entry point uses raw TMDB extracts already present in data/raw and does not
+call the API. EDA, large-run paths, and the standalone blockbuster classifier
+remain separate commands so each stage has an explicit input and output.
 """
 import json
 from pathlib import Path
@@ -65,11 +66,16 @@ def create_results_summary(metrics_path=Path("models/metrics.json"), output_path
 
 
 def run_pipeline():
-    """Run preparation, training, evaluation, and results export in order."""
+    """Run cleaning, feature creation, standard training, and evaluation.
+
+    Random Forest is evaluated here because it is the selected revenue model in
+    the current large experiment. Alternative models remain available in the
+    saved metrics for comparison.
+    """
     clean_movie_data()
     build_features()
     train()
-    evaluate(model_name="gradient_boosting")
+    evaluate(model_name="random_forest")
     output_path = create_results_summary()
     print(f"\nSaved organized model results to {output_path}")
 

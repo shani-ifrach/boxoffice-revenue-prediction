@@ -19,6 +19,14 @@ CATEGORICAL_FEATURES = ["release_season", "primary_genre", "original_language"]
 
 
 def make_preprocessor(features):
+    """Build a reusable preprocessing step for numeric and categorical inputs.
+
+    Numeric missing values are replaced with the training median, while
+    categorical missing values use the most frequent category. One-hot encoding
+    uses handle_unknown=ignore so a genuinely new genre or language does not
+    crash scoring. The preprocessing remains inside the Pipeline to prevent
+    fitting transformations on validation or test rows.
+    """
     numeric = [column for column in features if column not in CATEGORICAL_FEATURES]
     categorical = [column for column in features if column in CATEGORICAL_FEATURES]
     return ColumnTransformer([
@@ -28,14 +36,17 @@ def make_preprocessor(features):
 
 
 def make_pipeline(estimator):
+    """Combine the shared feature preprocessing with one estimator."""
     return Pipeline([("preprocess", make_preprocessor(PRE_RELEASE_FEATURES)), ("model", estimator)])
 
 
 def regression_metrics(actual, predicted):
+    """Return dollar-space regression metrics for readable business reporting."""
     return {"MAE": mean_absolute_error(actual, predicted), "RMSE": mean_squared_error(actual, predicted) ** 0.5, "R2": r2_score(actual, predicted)}
 
 
 def classification_metrics(actual, predicted, probability):
+    """Return threshold metrics plus ROC-AUC for a binary classifier."""
     return {"accuracy": accuracy_score(actual, predicted), "precision": precision_score(actual, predicted, zero_division=0), "recall": recall_score(actual, predicted, zero_division=0), "F1": f1_score(actual, predicted, zero_division=0), "ROC_AUC": roc_auc_score(actual, probability)}
 
 
@@ -89,6 +100,12 @@ def add_history_from_prior_period(target, history):
 
 
 def train():
+    """Train, compare, and save the standard revenue and profitability models.
+
+    Validation is used for model decisions and classification thresholds. After
+    those decisions are made, each final model is refit on Train plus Validation
+    and evaluated once on the future Test period.
+    """
     movies = pd.read_csv("data/processed/movies_features.csv")
     movies = movies[movies["budget_usd"].notna() & movies["profitable"].notna()].sort_values("release_date")
     movies["release_year"] = movies["release_year"].astype(int)
