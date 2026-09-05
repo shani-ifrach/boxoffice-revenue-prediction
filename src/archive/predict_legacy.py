@@ -5,7 +5,6 @@ released before the requested movie. It therefore uses the same feature contract
 training instead of asking a user to guess director, cast, or company statistics.
 """
 import argparse
-import json
 from pathlib import Path
 
 import joblib
@@ -15,12 +14,6 @@ import pandas as pd
 from src.collect_tmdb import tmdb_get
 from src.data_cleaning import flatten_movie
 from src.train_model import PRE_RELEASE_FEATURES
-
-
-DEFAULT_HISTORY_PATH = Path("experiments/large_run/data/processed/movies_clean.csv")
-DEFAULT_REVENUE_MODEL_PATH = Path("experiments/large_run/models/regression_random_forest.joblib")
-DEFAULT_BLOCKBUSTER_MODEL_PATH = Path("experiments/large_run/models/blockbuster_400m/blockbuster_400m_classifier.joblib")
-BLOCKBUSTER_THRESHOLD_USD = 400_000_000
 
 
 def _entity_history(history, entity_column, entity_value):
@@ -63,7 +56,7 @@ def _list_max_history(history, list_column, entity_ids):
     return combined["worldwide_revenue_usd"].max() if not combined.empty else np.nan
 
 
-def build_prediction_row(movie_record, history_path=DEFAULT_HISTORY_PATH):
+def build_prediction_row(movie_record, history_path=Path("data/processed/movies_clean.csv")):
     """Build exactly the columns expected by the saved pipelines.
 
     Only historical rows with an earlier release date are eligible for aggregate
@@ -101,48 +94,23 @@ def build_prediction_row(movie_record, history_path=DEFAULT_HISTORY_PATH):
     return pd.DataFrame([row], columns=PRE_RELEASE_FEATURES)
 
 
-def predict_tmdb_movie(
-    tmdb_id,
-    history_path=DEFAULT_HISTORY_PATH,
-    revenue_model_path=DEFAULT_REVENUE_MODEL_PATH,
-    blockbuster_model_path=DEFAULT_BLOCKBUSTER_MODEL_PATH,
-):
-    """Return one revenue estimate and one independent blockbuster probability."""
+def predict_tmdb_movie(tmdb_id):
+    """Fetch a movie by TMDB ID and return revenue plus profitability probability."""
     import os
-
     token = os.getenv("TMDB_API_KEY")
     if not token:
         raise SystemExit("Set TMDB_API_KEY before requesting a movie prediction.")
-    movie_record = tmdb_get(
-        f"movie/{tmdb_id}",
-        token,
-        {"append_to_response": "credits", "language": "en-US"},
-    )
-    row = build_prediction_row(movie_record, history_path)
-    revenue_model = joblib.load(revenue_model_path)
-    blockbuster_model = joblib.load(blockbuster_model_path)
+    movie_record = tmdb_get(f"movie/{tmdb_id}", token, {"append_to_response": "credits", "language": "en-US"})
+    row = build_prediction_row(movie_record)
+    revenue_model = joblib.load("models/regression_random_forest.joblib")
+    profit_model = joblib.load("models/classification_gradient_boosting.joblib")
     predicted_revenue = float(max(0, np.expm1(revenue_model.predict(row)[0])))
-    blockbuster_probability = float(blockbuster_model.predict_proba(row)[0, 1])
-    return {
-        "tmdb_id": tmdb_id,
-        "title": movie_record.get("title"),
-        "predicted_revenue_usd": predicted_revenue,
-        "blockbuster_threshold_usd": BLOCKBUSTER_THRESHOLD_USD,
-        "blockbuster_probability": blockbuster_probability,
-        "blockbuster_prediction": int(blockbuster_probability >= 0.5),
-    }
-
-
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--tmdb-id", type=int, required=True)
-    parser.add_argument("--history-path", type=Path, default=DEFAULT_HISTORY_PATH)
-    parser.add_argument("--revenue-model-path", type=Path, default=DEFAULT_REVENUE_MODEL_PATH)
-    parser.add_argument("--blockbuster-model-path", type=Path, default=DEFAULT_BLOCKBUSTER_MODEL_PATH)
-    args = parser.parse_args()
-    result = predict_tmdb_movie(args.tmdb_id, args.history_path, args.revenue_model_path, args.blockbuster_model_path)
-    print(json.dumps(result, indent=2))
+    profitability_probability = float(profit_model.predict_proba(row)[0, 1])
+    return predicted_revenue, profitability_probability
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--tmdb-id", type=int, required=True)
+    args = parser.parse_args()
+    print(predict_tmdb_movie(args.tmdb_id))
