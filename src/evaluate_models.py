@@ -12,7 +12,7 @@ import joblib
 import numpy as np
 import pandas as pd
 
-from src.train_model import PRE_RELEASE_FEATURES
+from src.train_model import PRE_RELEASE_FEATURES, add_history_from_prior_period
 
 
 def evaluate(model_name="gradient_boosting", input_path=Path("data/processed/movies_features.csv"), features=PRE_RELEASE_FEATURES):
@@ -25,7 +25,11 @@ def evaluate(model_name="gradient_boosting", input_path=Path("data/processed/mov
     movies = movies[movies["budget_usd"].notna() & movies["profitable"].notna()].copy()
     # Keep evaluation aligned with train_model.py: the final test period is
     # made of future release years, not a random or arbitrary row slice.
+    train_data = movies[movies["release_year"] <= 2019].copy()
+    validation_data = movies[movies["release_year"].between(2020, 2021)].copy()
     test_data = movies[movies["release_year"] >= 2022].copy()
+    validation_data = add_history_from_prior_period(validation_data, train_data)
+    test_data = add_history_from_prior_period(test_data, pd.concat([train_data, validation_data]))
     model = joblib.load(f"models/regression_{model_name}.joblib")
     test_data["predicted_revenue_usd"] = np.maximum(0, np.expm1(model.predict(test_data[features])))
     test_data["absolute_error_usd"] = (test_data["worldwide_revenue_usd"] - test_data["predicted_revenue_usd"]).abs()

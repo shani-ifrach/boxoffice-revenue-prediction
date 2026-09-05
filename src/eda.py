@@ -66,7 +66,7 @@ def run_eda(input_path=Path("data/processed/movies_features.csv"), output_dir=Pa
     ).reset_index()
     save_table(budget_summary, output_dir / "eda_budget_summary.csv")
 
-    rating_summary = movies.groupby(pd.qcut(movies["vote_average"], q=4, duplicates="drop")).agg(
+    rating_summary = movies.groupby(pd.qcut(movies["vote_average"], q=4, duplicates="drop"), observed=False).agg(
         movie_count=("tmdb_id", "count"), median_revenue_usd=("worldwide_revenue_usd", "median"),
     ).reset_index().rename(columns={"vote_average": "rating_band"})
     save_table(rating_summary, output_dir / "eda_rating_summary.csv")

@@ -64,10 +64,12 @@ def clean_movie_data(raw_dir=Path("data/raw"), output_path=Path("data/processed/
     retained for descriptive analysis, but their ``profitable`` label remains
     missing and they are excluded later from budget-dependent modeling.
     """
+    merged_path = raw_dir / "tmdb_movies_merged.json"
     raw_files = sorted(raw_dir.glob("tmdb_movies_*.json"))
     if not raw_files:
         raise SystemExit("No raw TMDB extract found. Run src.collect_tmdb first.")
-    records = json.loads(raw_files[-1].read_text(encoding="utf-8"))
+    source_path = merged_path if merged_path.exists() else raw_files[-1]
+    records = json.loads(source_path.read_text(encoding="utf-8"))
     movies = pd.DataFrame([flatten_movie(record) for record in records])
     movies = movies.drop_duplicates("tmdb_id").copy()
     movies["release_date"] = pd.to_datetime(movies["release_date"], errors="coerce")

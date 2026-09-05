@@ -19,7 +19,7 @@ The large run contains 3,607 cleaned movies. Of these, 2,816 have both a reporte
 
 ## Pre-release feature design
 
-The model uses 38 features from information that could plausibly be available before release:
+The model uses 35 features from information that could plausibly be available before release. Three redundant fields were removed after Large Run ablation: `company_count`, `log_budget_usd`, and `production_company_previous_max_revenue`.
 
 - budget, runtime, release year/month/season, language, genre, countries, companies, and cast size;
 - franchise and sequel indicators;
@@ -47,14 +47,14 @@ The target is log-transformed during training because box-office revenue is stro
 
 | Model | Test MAE | Test RMSE | Test R² |
 |---|---:|---:|---:|
-| Ridge | $90.5M | $237.8M | 0.118 |
-| Random Forest | **$72.0M** | **$176.8M** | **0.512** |
-| Gradient Boosting | $80.6M | $203.3M | 0.355 |
+| Ridge | $521.3M | $6,130.5M | -585.482 |
+| Random Forest | **$73.8M** | **$178.2M** | **0.504** |
+| Gradient Boosting | $81.2M | $205.4M | 0.342 |
 | Median-revenue baseline | $118.2M | $266.5M | -0.108 |
 
-The selected revenue model is Random Forest. Its Test MAE is approximately 39% lower than the median-revenue baseline.
+The selected revenue model is Random Forest. Its Test MAE is approximately 37.5% lower than the median-revenue baseline.
 
-An MAE of $72M means that the average absolute difference between predicted and actual revenue is about $72M. It does not mean that every movie is within $72M, and it does not mean the model is 72% accurate.
+An MAE of $73.8M means that the average absolute difference between predicted and actual revenue is about $73.8M. It does not mean that every movie is within $73.8M, and it does not mean the model is 73.8% accurate.
 
 ## Profitability classification
 
@@ -62,9 +62,9 @@ The profitability task predicts whether worldwide revenue exceeds reported budge
 
 | Model | Test Accuracy | Precision | Recall | F1 | ROC-AUC |
 |---|---:|---:|---:|---:|---:|
-| Logistic Regression | **66.1%** | 73.1% | 69.8% | **71.4%** | 72.5% |
-| Random Forest | 62.9% | 71.7% | 64.1% | 67.7% | 71.8% |
-| Gradient Boosting | 64.8% | 73.6% | 65.5% | 69.3% | **73.2%** |
+| Logistic Regression | **65.4%** | 74.7% | 65.1% | **69.6%** | 71.4% |
+| Random Forest | 63.3% | 77.1% | 56.2% | 65.0% | 70.7% |
+| Gradient Boosting | 62.9% | 82.6% | 49.1% | 61.6% | **73.1%** |
 | Majority baseline | 60.7% | — | — | — | — |
 
 Logistic Regression gives the strongest F1 and accuracy in this experiment. Gradient Boosting gives the strongest ROC-AUC, so it ranks profitability probabilities slightly better. The choice depends on whether the business prefers balanced classification or probability ranking.
@@ -77,11 +77,11 @@ The separate classifier predicts whether a movie will exceed $400M worldwide rev
 
 | Metric | Validation | Test |
 |---|---:|---:|
-| Accuracy | 89.3% | 92.7% |
-| Precision | 32.4% | 56.1% |
-| Recall | 92.3% | 88.1% |
-| F1 | 48.0% | 68.5% |
-| ROC-AUC | 96.6% | 97.6% |
+| Accuracy | 89.3% | 92.4% |
+| Precision | 31.4% | 55.2% |
+| Recall | 84.6% | 88.1% |
+| F1 | 45.8% | 67.9% |
+| ROC-AUC | 96.2% | 97.7% |
 
 The high Recall means the model identifies most movies that cross the threshold. Precision is lower, so some movies predicted to exceed $400M do not actually cross it.
 
@@ -93,24 +93,19 @@ The selected revenue model performs differently across revenue levels:
 
 | Segment | Movies | MAE |
 |---|---:|---:|
-| Regular, below $250M | 396 | $33.8M |
-| Successful, $250M–$500M | 40 | $181.5M |
-| Blockbuster, above $500M | 27 | $469.8M |
+| Regular, below $250M | 396 | $34.9M |
+| Successful, $250M–$500M | 40 | $177.9M |
+| Blockbuster, above $500M | 27 | $489.9M |
 
-The model is reasonably useful for typical movies but systematically underpredicts extreme blockbusters. For the blockbuster segment, median actual revenue was approximately $845.6M while median predicted revenue was approximately $513.0M.
+The model is reasonably useful for typical movies but systematically underpredicts extreme blockbusters. For the blockbuster segment, median actual revenue was approximately $845.6M while median predicted revenue was approximately $442.5M.
 
 This is the most important limitation of the model. TMDB does not capture enough information about marketing scale, cultural momentum, brand awareness, release competition, or campaign reach to reliably identify every global phenomenon.
 
-## Feature ablation
+## Feature ablation and stability
 
-Removing groups of historical features reduced Validation performance:
+The 35-feature model was selected after Large Run ablation and remained better in all three forward-looking Test windows used in the temporal stability check. Test MAE improved over the 38-feature model in the windows beginning in 2018, 2020, and 2022.
 
-- Full model, 38 features: Validation R² approximately 0.476.
-- Basic features only, 13 features: Validation R² approximately 0.332.
-- Removing company history reduced Validation performance.
-- Removing cast history slightly improved one Test result but performed worse on Validation.
-
-The full model is therefore retained. The result suggests that the additional history features provide useful signal and are not merely unnecessary complexity.
+The removed fields were `company_count`, `log_budget_usd`, and `production_company_previous_max_revenue`. The remaining history features provide useful signal, while the removed fields add redundant or unstable information.
 
 ## Business interpretation
 

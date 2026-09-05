@@ -19,7 +19,7 @@ This document describes the main analytical fields used in the cleaned and featu
 | worldwide_revenue_usd | Reported worldwide gross revenue | Regression target and historical analysis |
 | profitable | 1 when revenue is greater than budget | Classification target |
 | roi_simple | Revenue minus budget, divided by budget | Descriptive analysis only |
-| log_budget_usd | log1p of reported budget | Model feature for scale compression |
+| log_budget_usd | log1p of reported budget | Retained engineered field; excluded from the production model |
 | budget_category | Budget quartile created for descriptive analysis | Dashboard grouping only |
 
 Zero budget and revenue values are treated as missing during cleaning because they commonly indicate unreported values in TMDB. Profitability is a simplified gross-over-budget proxy, not accounting profit.

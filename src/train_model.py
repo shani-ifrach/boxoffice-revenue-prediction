@@ -69,34 +69,64 @@ def add_history_from_prior_period(target, history):
     target = target.copy()
     history = history.copy()
 
-    def single_entity(entity, prefix):
-        prior = history[history[entity].notna()].groupby(entity).agg(
-            count=("tmdb_id", "count"), avg_revenue=("worldwide_revenue_usd", "mean"),
-            success_rate=("profitable", "mean"),
-        )
-        mapped = target[entity].map(prior["count"]).rename(f"{prefix}_previous_movie_count")
-        target[f"{prefix}_previous_movie_count"] = mapped
-        target[f"{prefix}_previous_avg_revenue"] = target[entity].map(prior["avg_revenue"])
-        target[f"{prefix}_previous_success_rate"] = target[entity].map(prior["success_rate"])
+    def replace_history_columns(frame, summary, key_column, prefix, column_map):
+        """Map an entity summary onto target rows, replacing stale features."""
+        names = [f"{prefix}_{suffix}" for suffix in column_map]
+        mapped = pd.DataFrame({f"{prefix}_{suffix}": frame[key_column].map(summary[source]) for suffix, source in column_map.items()}, index=frame.index)
+        return frame.drop(columns=names, errors="ignore").join(mapped)
 
-    single_entity("director", "director")
-    single_entity("collection_id", "franchise")
+    prior = history.sort_values(["release_date", "tmdb_id"])
+    director_summary = prior[prior["director"].notna()].groupby("director").agg(
+        count=("tmdb_id", "count"), avg_revenue=("worldwide_revenue_usd", "mean"),
+        max_revenue=("worldwide_revenue_usd", "max"), success_rate=("profitable", "mean"),
+        avg_rating=("vote_average", "mean"),
+    )
+    target = replace_history_columns(
+        target, director_summary, "director", "director_previous",
+        {"movie_count": "count", "avg_revenue": "avg_revenue", "max_revenue": "max_revenue", "success_rate": "success_rate", "avg_rating": "avg_rating"},
+    )
+
+    franchise_prior = prior[prior["collection_id"].notna()].copy()
+    franchise_summary = franchise_prior.groupby("collection_id").agg(
+        count=("tmdb_id", "count"), avg_revenue=("worldwide_revenue_usd", "mean"),
+        max_revenue=("worldwide_revenue_usd", "max"), median_revenue=("worldwide_revenue_usd", "median"),
+        success_rate=("profitable", "mean"), avg_rating=("vote_average", "mean"),
+    )
+    franchise_latest = franchise_prior.groupby("collection_id").tail(1).set_index("collection_id")
+    franchise_summary["last_revenue"] = franchise_latest["worldwide_revenue_usd"]
+    franchise_summary["latest_success"] = franchise_latest["profitable"]
+    target = replace_history_columns(
+        target, franchise_summary, "collection_id", "franchise_previous",
+        {"movie_count": "count", "avg_revenue": "avg_revenue", "last_revenue": "last_revenue", "max_revenue": "max_revenue", "median_revenue": "median_revenue", "success_rate": "success_rate", "latest_success": "latest_success", "avg_rating": "avg_rating"},
+    )
 
     def list_entity(list_column, prefix):
         prior = history[["tmdb_id", list_column, "worldwide_revenue_usd", "profitable"]].copy()
+        prior["vote_average"] = history["vote_average"]
         prior["entity_id"] = prior[list_column].fillna("").str.split("; ")
         prior = prior.explode("entity_id")
         prior = prior[prior["entity_id"].ne("")]
-        summary = prior.groupby("entity_id").agg(count=("tmdb_id", "count"), avg_revenue=("worldwide_revenue_usd", "mean"), success_rate=("profitable", "mean"))
+        summary = prior.groupby("entity_id").agg(
+            count=("tmdb_id", "count"), avg_revenue=("worldwide_revenue_usd", "mean"),
+            max_revenue=("worldwide_revenue_usd", "max"), success_rate=("profitable", "mean"),
+            avg_rating=("vote_average", "mean"),
+        )
         expanded = target[["tmdb_id", list_column]].copy()
         expanded["entity_id"] = expanded[list_column].fillna("").str.split("; ")
         expanded = expanded.explode("entity_id")
         expanded = expanded[expanded["entity_id"].ne("")]
         expanded = expanded.join(summary, on="entity_id")
         movie_summary = expanded.groupby("tmdb_id").agg(
-            **{f"{prefix}_previous_movie_count": ("count", "max"), f"{prefix}_previous_avg_revenue": ("avg_revenue", "mean"), f"{prefix}_previous_success_rate": ("success_rate", "mean")}
+            **{
+                f"{prefix}_previous_movie_count": ("count", "max"),
+                f"{prefix}_previous_avg_revenue": ("avg_revenue", "mean"),
+                f"{prefix}_previous_max_revenue": ("max_revenue", "max"),
+                f"{prefix}_previous_success_rate": ("success_rate", "mean"),
+                f"{prefix}_previous_avg_rating": ("avg_rating", "mean"),
+            }
         )
-        return target.join(movie_summary, on="tmdb_id", rsuffix="_new")
+        names = [column for column in movie_summary.columns]
+        return target.drop(columns=names, errors="ignore").join(movie_summary, on="tmdb_id")
 
     target = list_entity("production_company_ids", "production_company")
     target = list_entity("cast_ids_top10", "cast")
@@ -126,7 +156,7 @@ def train(features=PRE_RELEASE_FEATURES):
     y_validation_revenue, y_test_revenue = validation_data["worldwide_revenue_usd"], test_data["worldwide_revenue_usd"]
     regression_models = {"ridge": Ridge(alpha=10.0), "random_forest": RandomForestRegressor(n_estimators=400, min_samples_leaf=4, max_features=0.8, random_state=42, n_jobs=-1), "gradient_boosting": GradientBoostingRegressor(n_estimators=150, learning_rate=0.04, max_depth=2, loss="huber", random_state=42)}
     classification_models = {"logistic_regression": LogisticRegression(max_iter=2000, class_weight="balanced"), "random_forest": RandomForestClassifier(n_estimators=400, min_samples_leaf=4, max_features=0.8, random_state=42, class_weight="balanced", n_jobs=-1), "gradient_boosting": GradientBoostingClassifier(n_estimators=150, learning_rate=0.04, max_depth=2, random_state=42)}
-    metrics = {"regression": {}, "classification": {}, "split": {"train_rows": len(train_data), "validation_rows": len(validation_data), "test_rows": len(test_data), "train_years": "2010-2019", "validation_years": "2020-2021", "test_years": "2022-2024"}}
+    metrics = {"feature_count": len(features), "regression": {}, "classification": {}, "split": {"train_rows": len(train_data), "validation_rows": len(validation_data), "test_rows": len(test_data), "train_years": "2010-2019", "validation_years": "2020-2021", "test_years": "2022-2024"}}
     Path("models").mkdir(exist_ok=True)
 
     for name, estimator in regression_models.items():

@@ -38,9 +38,9 @@ Revenue is trained on log1p revenue because the target is heavily right-skewed. 
 
 | Metric | Test result |
 |---|---:|
-| MAE | approximately $72.0M |
-| RMSE | approximately $176.8M |
-| R² | approximately 0.512 |
+| MAE | approximately $73.8M |
+| RMSE | approximately $178.2M |
+| R² | approximately 0.504 |
 
 The median-revenue baseline had MAE of approximately $118.2M and R² of -0.108.
 
@@ -48,11 +48,11 @@ The median-revenue baseline had MAE of approximately $118.2M and R² of -0.108.
 
 | Metric | Test result |
 |---|---:|
-| Accuracy | 92.7% |
-| Precision | 56.1% |
+| Accuracy | 92.4% |
+| Precision | 55.2% |
 | Recall | 88.1% |
-| F1 | 68.5% |
-| ROC-AUC | 97.6% |
+| F1 | 67.9% |
+| ROC-AUC | 97.7% |
 
 ## Leakage controls
 
@@ -70,7 +70,7 @@ The model is not a guaranteed financial forecast, an accounting profit calculati
 
 ## Known limitations
 
-The largest errors occur for extreme blockbusters. In the Test error analysis, Regular movies had MAE of approximately $33.8M, movies between $250M and $500M had MAE of approximately $181.5M, and movies above $500M had MAE of approximately $469.8M.
+The largest errors occur for extreme blockbusters. In the Test error analysis, Regular movies had MAE of approximately $34.9M, movies between $250M and $500M had MAE of approximately $177.9M, and movies above $500M had MAE of approximately $489.9M.
 
 The model tends to underpredict global phenomena because TMDB does not contain reliable measures of marketing scale, cultural momentum, release competition, or brand awareness. The blockbuster Test segment also contains relatively few movies.
 
