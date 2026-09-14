@@ -10,7 +10,7 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.pipeline import Pipeline
 
-from src.train_model import FULL_PRE_RELEASE_FEATURES, PRE_RELEASE_FEATURES, add_history_from_prior_period, make_preprocessor
+from src.train_model import FULL_PRE_RELEASE_FEATURES, PRE_RELEASE_FEATURES, make_preprocessor
 
 
 FEATURE_GROUPS = {
@@ -54,7 +54,7 @@ def make_regression_pipeline(features):
     return Pipeline([
         ("preprocess", make_preprocessor(features)),
         ("model", RandomForestRegressor(
-            n_estimators=400, min_samples_leaf=4, max_features=0.8,
+            n_estimators=120, min_samples_leaf=4, max_features=0.8,
             random_state=42, n_jobs=-1,
         )),
     ])
@@ -71,30 +71,24 @@ def metrics(actual, predicted):
 def run_ablation(input_path=Path("data/processed/movies_features.csv"), output_dir=Path("reports")):
     """Measure whether feature groups improve a fixed Random Forest setup.
 
-    The comparison is used for feature selection, so Validation is the primary
-    decision set. Test results are reported for transparency but are not used to
-    choose a feature set.
+    The comparison uses rolling validation only. The final 2022-2024 holdout is
+    never opened for feature selection.
     """
     movies = pd.read_csv(input_path, parse_dates=["release_date"])
-    movies = movies[movies["budget_usd"].notna() & movies["worldwide_revenue_usd"].notna()].copy()
+    movies = movies[movies["worldwide_revenue_usd"].notna()].copy()
     movies = movies.sort_values("release_date")
-    train_data = movies[movies["release_year"] <= 2019].copy()
-    validation_data = movies[movies["release_year"].between(2020, 2021)].copy()
-    test_data = movies[movies["release_year"] >= 2022].copy()
-    validation_data = add_history_from_prior_period(validation_data, train_data)
-    test_data = add_history_from_prior_period(test_data, pd.concat([train_data, validation_data]))
-
     rows = []
     experiments = {**FEATURE_GROUPS, **build_single_feature_ablation_groups()}
     for experiment_name, features in experiments.items():
-        model = make_regression_pipeline(features)
-        model.fit(train_data[features], np.log1p(train_data["worldwide_revenue_usd"]))
-        validation_prediction = np.maximum(0, np.expm1(model.predict(validation_data[features])))
-        test_prediction = np.maximum(0, np.expm1(model.predict(test_data[features])))
-        row = {"experiment": experiment_name, "feature_count": len(features)}
-        row.update({f"validation_{key}": value for key, value in metrics(validation_data["worldwide_revenue_usd"], validation_prediction).items()})
-        row.update({f"test_{key}": value for key, value in metrics(test_data["worldwide_revenue_usd"], test_prediction).items()})
-        rows.append(row)
+        for train_end, validation_start, validation_end in [(2015, 2016, 2017), (2017, 2018, 2019), (2019, 2020, 2021)]:
+            train_data = movies[movies.release_year <= train_end]
+            validation_data = movies[movies.release_year.between(validation_start, validation_end)]
+            model = make_regression_pipeline(features)
+            model.fit(train_data[features], np.log1p(train_data["worldwide_revenue_usd"]))
+            prediction = np.maximum(0, np.expm1(model.predict(validation_data[features])))
+            row = {"experiment": experiment_name, "feature_count": len(features), "train_end": train_end, "validation_years": f"{validation_start}-{validation_end}"}
+            row.update({f"validation_{key}": value for key, value in metrics(validation_data["worldwide_revenue_usd"], prediction).items()})
+            rows.append(row)
 
     results = pd.DataFrame(rows).sort_values("validation_MAE_usd")
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -102,16 +96,16 @@ def run_ablation(input_path=Path("data/processed/movies_features.csv"), output_d
     print(results.to_string(index=False))
     print(f"\nSaved feature ablation results to {output_dir / 'feature_ablation_results.csv'}")
 
-    full_validation_mae = results.loc[results["experiment"].eq("full_model"), "validation_MAE_usd"].iloc[0]
-    full_test_mae = results.loc[results["experiment"].eq("full_model"), "test_MAE_usd"].iloc[0]
+    averages = results.groupby(["experiment", "feature_count"], as_index=False).agg(validation_MAE_usd=("validation_MAE_usd", "mean"), validation_RMSE_usd=("validation_RMSE_usd", "mean"), validation_R2=("validation_R2", "mean"))
+    averages.to_csv(output_dir / "feature_ablation_summary.csv", index=False, float_format="%.4f")
+    full_validation_mae = averages.loc[averages["experiment"].eq("full_model"), "validation_MAE_usd"].iloc[0]
     single_feature_names = {f"without_{feature}" for feature in FULL_PRE_RELEASE_FEATURES}
-    single_feature = results[results["experiment"].isin(single_feature_names)].copy()
+    single_feature = averages[averages["experiment"].isin(single_feature_names)].copy()
     single_feature["validation_mae_change_usd"] = single_feature["validation_MAE_usd"] - full_validation_mae
-    single_feature["test_mae_change_usd"] = single_feature["test_MAE_usd"] - full_test_mae
     single_feature = single_feature.sort_values("validation_mae_change_usd", ascending=False)
     single_feature.to_csv(output_dir / "single_feature_ablation_results.csv", index=False, float_format="%.4f")
     print("\nLeave-one-feature-out results, ranked by validation MAE increase:")
-    print(single_feature[["experiment", "validation_mae_change_usd", "test_mae_change_usd"]].to_string(index=False))
+    print(single_feature[["experiment", "validation_mae_change_usd"]].to_string(index=False))
     print(f"\nSaved {output_dir / 'single_feature_ablation_results.csv'}")
 
 

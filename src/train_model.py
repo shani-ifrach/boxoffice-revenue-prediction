@@ -1,195 +1,209 @@
-"""Train leakage-aware revenue and profitability models."""
+"""Temporal model selection, final holdout evaluation, and versioned artifacts."""
 import json
+import platform
+from datetime import datetime, timezone
 from pathlib import Path
 
 import joblib
 import numpy as np
 import pandas as pd
+import sklearn
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import GradientBoostingClassifier, GradientBoostingRegressor, RandomForestClassifier, RandomForestRegressor
 from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LogisticRegression, Ridge
-from sklearn.metrics import accuracy_score, f1_score, mean_absolute_error, mean_squared_error, precision_score, r2_score, recall_score, roc_auc_score
+from sklearn.metrics import (accuracy_score, average_precision_score, brier_score_loss, confusion_matrix, f1_score, mean_absolute_error, mean_squared_error, precision_score, r2_score, recall_score, roc_auc_score)
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from sklearn.calibration import calibration_curve
+from sklearn.inspection import permutation_importance
 
+from src.config import BLOCKBUSTER_THRESHOLD_USD, CONFORMAL_COVERAGE, RANDOM_SEED, SCHEMA_VERSION
+from src.feature_engineering import add_historical_features
 
 FULL_PRE_RELEASE_FEATURES = ["budget_usd", "log_budget_usd", "runtime_minutes", "release_year", "release_month", "release_season", "primary_genre", "original_language", "genre_count", "country_count", "company_count", "cast_size_top10", "is_franchise", "is_sequel", "is_summer_release", "is_holiday_release", "franchise_previous_movie_count", "franchise_previous_avg_revenue", "franchise_previous_last_revenue", "franchise_previous_max_revenue", "franchise_previous_median_revenue", "franchise_previous_success_rate", "franchise_previous_latest_success", "franchise_previous_avg_rating", "director_previous_movie_count", "director_previous_avg_revenue", "director_previous_max_revenue", "director_previous_success_rate", "director_previous_avg_rating", "production_company_previous_movie_count", "production_company_previous_avg_revenue", "production_company_previous_max_revenue", "production_company_previous_success_rate", "cast_previous_movie_count", "cast_previous_avg_revenue", "cast_previous_max_revenue", "cast_previous_success_rate", "cast_previous_avg_rating"]
 REMOVED_FEATURES = {"production_company_previous_max_revenue", "company_count", "log_budget_usd"}
 REDUCED_PRE_RELEASE_FEATURES = [feature for feature in FULL_PRE_RELEASE_FEATURES if feature not in REMOVED_FEATURES]
-# The production feature contract is now the validated 35-feature version.
 PRE_RELEASE_FEATURES = REDUCED_PRE_RELEASE_FEATURES
 CATEGORICAL_FEATURES = ["release_season", "primary_genre", "original_language"]
+ROLLING_FOLDS = [(2015, 2016, 2017), (2017, 2018, 2019), (2019, 2020, 2021)]
+
+
+def add_history_from_prior_period(target, history):
+    """Backward-compatible name for archived experiments; uses strict dates."""
+    return add_historical_features(target, history)
 
 
 def make_preprocessor(features):
-    """Build a reusable preprocessing step for numeric and categorical inputs.
-
-    Numeric missing values are replaced with the training median, while
-    categorical missing values use the most frequent category. One-hot encoding
-    uses handle_unknown=ignore so a genuinely new genre or language does not
-    crash scoring. The preprocessing remains inside the Pipeline to prevent
-    fitting transformations on validation or test rows.
-    """
-    numeric = [column for column in features if column not in CATEGORICAL_FEATURES]
-    categorical = [column for column in features if column in CATEGORICAL_FEATURES]
+    """Build preprocessing that imputes missing values and encodes categories."""
+    numeric = [c for c in features if c not in CATEGORICAL_FEATURES]
+    categorical = [c for c in features if c in CATEGORICAL_FEATURES]
     return ColumnTransformer([
-        ("numeric", Pipeline([("imputer", SimpleImputer(strategy="median")), ("scale", StandardScaler())]), numeric),
+        ("numeric", Pipeline([("imputer", SimpleImputer(strategy="median", keep_empty_features=True)), ("scale", StandardScaler())]), numeric),
         ("categorical", Pipeline([("imputer", SimpleImputer(strategy="most_frequent")), ("onehot", OneHotEncoder(handle_unknown="ignore"))]), categorical),
     ])
 
 
 def make_pipeline(estimator, features=PRE_RELEASE_FEATURES):
-    """Combine the shared feature preprocessing with one estimator."""
+    """Wrap an estimator with the project preprocessing contract."""
     return Pipeline([("preprocess", make_preprocessor(features)), ("model", estimator)])
 
 
 def regression_metrics(actual, predicted):
-    """Return dollar-space regression metrics for readable business reporting."""
-    return {"MAE": mean_absolute_error(actual, predicted), "RMSE": mean_squared_error(actual, predicted) ** 0.5, "R2": r2_score(actual, predicted)}
+    """Return the regression metrics reported for model selection and QA."""
+    return {"MAE": float(mean_absolute_error(actual, predicted)), "RMSE": float(mean_squared_error(actual, predicted) ** 0.5), "R2": float(r2_score(actual, predicted))}
 
 
 def classification_metrics(actual, predicted, probability):
-    """Return threshold metrics plus ROC-AUC for a binary classifier."""
-    return {"accuracy": accuracy_score(actual, predicted), "precision": precision_score(actual, predicted, zero_division=0), "recall": recall_score(actual, predicted, zero_division=0), "F1": f1_score(actual, predicted, zero_division=0), "ROC_AUC": roc_auc_score(actual, probability)}
+    """Return threshold, ranking, calibration, and confusion-matrix metrics."""
+    tn, fp, fn, tp = confusion_matrix(actual, predicted, labels=[0, 1]).ravel()
+    return {"accuracy": float(accuracy_score(actual, predicted)), "precision": float(precision_score(actual, predicted, zero_division=0)), "recall": float(recall_score(actual, predicted, zero_division=0)), "F1": float(f1_score(actual, predicted, zero_division=0)), "ROC_AUC": float(roc_auc_score(actual, probability)), "PR_AUC": float(average_precision_score(actual, probability)), "Brier": float(brier_score_loss(actual, probability)), "confusion_matrix": {"tn": int(tn), "fp": int(fp), "fn": int(fn), "tp": int(tp)}}
 
 
-def calibration_factor(actual, predicted):
-    """Learn a multiplicative correction from validation predictions only."""
-    valid = (actual.to_numpy() > 0) & (predicted > 0)
-    return float(np.median(actual.to_numpy()[valid] / predicted[valid]))
+def _regressors():
+    return {
+        "ridge": Ridge(alpha=10.0),
+        "random_forest": RandomForestRegressor(n_estimators=250, min_samples_leaf=4, max_features=0.8, random_state=RANDOM_SEED, n_jobs=-1),
+        "gradient_boosting": GradientBoostingRegressor(n_estimators=180, learning_rate=0.04, max_depth=2, loss="huber", random_state=RANDOM_SEED),
+    }
 
 
-def add_history_from_prior_period(target, history):
-    """Attach entity history using only rows from an earlier time period.
-
-    This keeps the validation/test simulation honest: a batch of future films
-    cannot use the revenue of another future film that has not been released yet.
-    """
-    target = target.copy()
-    history = history.copy()
-
-    def replace_history_columns(frame, summary, key_column, prefix, column_map):
-        """Map an entity summary onto target rows, replacing stale features."""
-        names = [f"{prefix}_{suffix}" for suffix in column_map]
-        mapped = pd.DataFrame({f"{prefix}_{suffix}": frame[key_column].map(summary[source]) for suffix, source in column_map.items()}, index=frame.index)
-        return frame.drop(columns=names, errors="ignore").join(mapped)
-
-    prior = history.sort_values(["release_date", "tmdb_id"])
-    director_summary = prior[prior["director"].notna()].groupby("director").agg(
-        count=("tmdb_id", "count"), avg_revenue=("worldwide_revenue_usd", "mean"),
-        max_revenue=("worldwide_revenue_usd", "max"), success_rate=("profitable", "mean"),
-        avg_rating=("vote_average", "mean"),
-    )
-    target = replace_history_columns(
-        target, director_summary, "director", "director_previous",
-        {"movie_count": "count", "avg_revenue": "avg_revenue", "max_revenue": "max_revenue", "success_rate": "success_rate", "avg_rating": "avg_rating"},
-    )
-
-    franchise_prior = prior[prior["collection_id"].notna()].copy()
-    franchise_summary = franchise_prior.groupby("collection_id").agg(
-        count=("tmdb_id", "count"), avg_revenue=("worldwide_revenue_usd", "mean"),
-        max_revenue=("worldwide_revenue_usd", "max"), median_revenue=("worldwide_revenue_usd", "median"),
-        success_rate=("profitable", "mean"), avg_rating=("vote_average", "mean"),
-    )
-    franchise_latest = franchise_prior.groupby("collection_id").tail(1).set_index("collection_id")
-    franchise_summary["last_revenue"] = franchise_latest["worldwide_revenue_usd"]
-    franchise_summary["latest_success"] = franchise_latest["profitable"]
-    target = replace_history_columns(
-        target, franchise_summary, "collection_id", "franchise_previous",
-        {"movie_count": "count", "avg_revenue": "avg_revenue", "last_revenue": "last_revenue", "max_revenue": "max_revenue", "median_revenue": "median_revenue", "success_rate": "success_rate", "latest_success": "latest_success", "avg_rating": "avg_rating"},
-    )
-
-    def list_entity(list_column, prefix):
-        prior = history[["tmdb_id", list_column, "worldwide_revenue_usd", "profitable"]].copy()
-        prior["vote_average"] = history["vote_average"]
-        prior["entity_id"] = prior[list_column].fillna("").str.split("; ")
-        prior = prior.explode("entity_id")
-        prior = prior[prior["entity_id"].ne("")]
-        summary = prior.groupby("entity_id").agg(
-            count=("tmdb_id", "count"), avg_revenue=("worldwide_revenue_usd", "mean"),
-            max_revenue=("worldwide_revenue_usd", "max"), success_rate=("profitable", "mean"),
-            avg_rating=("vote_average", "mean"),
-        )
-        expanded = target[["tmdb_id", list_column]].copy()
-        expanded["entity_id"] = expanded[list_column].fillna("").str.split("; ")
-        expanded = expanded.explode("entity_id")
-        expanded = expanded[expanded["entity_id"].ne("")]
-        expanded = expanded.join(summary, on="entity_id")
-        movie_summary = expanded.groupby("tmdb_id").agg(
-            **{
-                f"{prefix}_previous_movie_count": ("count", "max"),
-                f"{prefix}_previous_avg_revenue": ("avg_revenue", "mean"),
-                f"{prefix}_previous_max_revenue": ("max_revenue", "max"),
-                f"{prefix}_previous_success_rate": ("success_rate", "mean"),
-                f"{prefix}_previous_avg_rating": ("avg_rating", "mean"),
-            }
-        )
-        names = [column for column in movie_summary.columns]
-        return target.drop(columns=names, errors="ignore").join(movie_summary, on="tmdb_id")
-
-    target = list_entity("production_company_ids", "production_company")
-    target = list_entity("cast_ids_top10", "cast")
-    return target
+def _classifiers():
+    return {
+        "logistic_regression": LogisticRegression(max_iter=2500, class_weight="balanced", random_state=RANDOM_SEED),
+        "random_forest": RandomForestClassifier(n_estimators=250, min_samples_leaf=4, max_features=0.8, random_state=RANDOM_SEED, class_weight="balanced", n_jobs=-1),
+        "gradient_boosting": GradientBoostingClassifier(n_estimators=180, learning_rate=0.04, max_depth=2, random_state=RANDOM_SEED),
+    }
 
 
-def train(features=PRE_RELEASE_FEATURES):
-    """Train, compare, and save the standard revenue and profitability models.
+def _safe_dollars(log_predictions, training_revenue):
+    # Training-derived ceiling prevents Ridge overflow without consulting holdout.
+    ceiling = float(np.log1p(training_revenue.max() * 2))
+    return np.expm1(np.clip(log_predictions, 0, ceiling))
 
-    Validation is used for model decisions and classification thresholds. After
-    those decisions are made, each final model is refit on Train plus Validation
-    and evaluated once on the future Test period.
-    """
-    movies = pd.read_csv("data/processed/movies_features.csv")
-    movies = movies[movies["budget_usd"].notna() & movies["profitable"].notna()].sort_values("release_date")
-    movies["release_year"] = movies["release_year"].astype(int)
-    train_data = movies[movies["release_year"] <= 2019]
-    validation_data = movies[movies["release_year"].isin([2020, 2021])]
-    test_data = movies[movies["release_year"] >= 2022]
-    if min(len(train_data), len(validation_data), len(test_data)) == 0:
-        raise ValueError("Each time split must contain at least one row.")
 
-    validation_data = add_history_from_prior_period(validation_data, train_data)
-    test_data = add_history_from_prior_period(test_data, pd.concat([train_data, validation_data]))
-    X_train, X_validation, X_test = train_data[features], validation_data[features], test_data[features]
-    y_train_log = np.log1p(train_data["worldwide_revenue_usd"])
-    y_validation_revenue, y_test_revenue = validation_data["worldwide_revenue_usd"], test_data["worldwide_revenue_usd"]
-    regression_models = {"ridge": Ridge(alpha=10.0), "random_forest": RandomForestRegressor(n_estimators=400, min_samples_leaf=4, max_features=0.8, random_state=42, n_jobs=-1), "gradient_boosting": GradientBoostingRegressor(n_estimators=150, learning_rate=0.04, max_depth=2, loss="huber", random_state=42)}
-    classification_models = {"logistic_regression": LogisticRegression(max_iter=2000, class_weight="balanced"), "random_forest": RandomForestClassifier(n_estimators=400, min_samples_leaf=4, max_features=0.8, random_state=42, class_weight="balanced", n_jobs=-1), "gradient_boosting": GradientBoostingClassifier(n_estimators=150, learning_rate=0.04, max_depth=2, random_state=42)}
-    metrics = {"feature_count": len(features), "regression": {}, "classification": {}, "split": {"train_rows": len(train_data), "validation_rows": len(validation_data), "test_rows": len(test_data), "train_years": "2010-2019", "validation_years": "2020-2021", "test_years": "2022-2024"}}
-    Path("models").mkdir(exist_ok=True)
+def _choose_threshold(actual, probability, minimum_recall=0.80):
+    candidates = np.linspace(0.05, 0.95, 181)
+    eligible = [t for t in candidates if recall_score(actual, probability >= t, zero_division=0) >= minimum_recall]
+    if eligible:
+        return float(max(eligible, key=lambda t: (precision_score(actual, probability >= t, zero_division=0), f1_score(actual, probability >= t, zero_division=0))))
+    return float(max(candidates, key=lambda t: f1_score(actual, probability >= t, zero_division=0)))
 
-    for name, estimator in regression_models.items():
-        validation_model = make_pipeline(estimator, features)
-        validation_model.fit(X_train, y_train_log)
-        validation_predictions = np.maximum(0, np.expm1(validation_model.predict(X_validation)))
-        factor = calibration_factor(y_validation_revenue, validation_predictions)
-        final_model = make_pipeline(estimator, features)
-        final_model.fit(pd.concat([train_data, validation_data])[features], np.log1p(pd.concat([train_data, validation_data])["worldwide_revenue_usd"]))
-        test_predictions = np.maximum(0, np.expm1(final_model.predict(X_test)))
-        calibrated_test_predictions = test_predictions * factor
-        metrics["regression"][name] = {"calibration_factor": factor, "validation": regression_metrics(y_validation_revenue, validation_predictions), "test": regression_metrics(y_test_revenue, test_predictions), "test_calibrated": regression_metrics(y_test_revenue, calibrated_test_predictions)}
-        joblib.dump(final_model, f"models/regression_{name}.joblib")
 
-    y_train, y_validation, y_test = train_data["profitable"].astype(int), validation_data["profitable"].astype(int), test_data["profitable"].astype(int)
-    combined = pd.concat([train_data, validation_data])
-    for name, estimator in classification_models.items():
-        validation_model = make_pipeline(estimator, features)
-        validation_model.fit(X_train, y_train)
-        validation_probability = validation_model.predict_proba(X_validation)[:, 1]
-        thresholds = np.arange(0.30, 0.71, 0.05)
-        best_threshold = max(thresholds, key=lambda threshold: f1_score(y_validation, validation_probability >= threshold, zero_division=0))
-        final_model = make_pipeline(estimator, features)
-        final_model.fit(combined[features], combined["profitable"].astype(int))
-        test_probability = final_model.predict_proba(X_test)[:, 1]
-        test_predictions = test_probability >= best_threshold
-        metrics["classification"][name] = {"threshold": float(best_threshold), "test": classification_metrics(y_test, test_predictions, test_probability)}
-        joblib.dump(final_model, f"models/classification_{name}.joblib")
+def _temporal_regression_selection(data, features):
+    rows, residuals = [], {}
+    for name, estimator in _regressors().items():
+        residuals[name] = []
+        for train_end, val_start, val_end in ROLLING_FOLDS:
+            train = data[data.release_year <= train_end]
+            val = data[data.release_year.between(val_start, val_end)]
+            model = make_pipeline(estimator, features)
+            model.fit(train[features], np.log1p(train.worldwide_revenue_usd))
+            prediction = _safe_dollars(model.predict(val[features]), train.worldwide_revenue_usd)
+            residuals[name].extend(np.abs(val.worldwide_revenue_usd.to_numpy() - prediction))
+            rows.append({"model": name, "train_end": train_end, "validation_years": f"{val_start}-{val_end}", "train_rows": len(train), "validation_rows": len(val), **regression_metrics(val.worldwide_revenue_usd, prediction)})
+    table = pd.DataFrame(rows)
+    selected = table.groupby("model").MAE.mean().idxmin()
+    return selected, table, np.asarray(residuals[selected])
 
-    metrics["baselines"] = {"classification_majority_accuracy_test": float(max(y_test.mean(), 1 - y_test.mean())), "regression_median_revenue_test": regression_metrics(y_test_revenue, np.repeat(train_data["worldwide_revenue_usd"].median(), len(y_test_revenue)))}
-    Path("models/metrics.json").write_text(json.dumps(metrics, indent=2), encoding="utf-8")
+
+def _temporal_classifier_selection(data, label, features):
+    rows, pooled = [], {}
+    for name, estimator in _classifiers().items():
+        ys, ps = [], []
+        for train_end, val_start, val_end in ROLLING_FOLDS:
+            train = data[data.release_year <= train_end]
+            val = data[data.release_year.between(val_start, val_end)]
+            if train[label].nunique() < 2 or val[label].nunique() < 2: continue
+            model = make_pipeline(estimator, features).fit(train[features], train[label])
+            probability = model.predict_proba(val[features])[:, 1]
+            ys.extend(val[label]); ps.extend(probability)
+            rows.append({"model": name, "train_end": train_end, "validation_years": f"{val_start}-{val_end}", "PR_AUC": average_precision_score(val[label], probability), "ROC_AUC": roc_auc_score(val[label], probability), "Brier": brier_score_loss(val[label], probability)})
+        pooled[name] = (np.asarray(ys), np.asarray(ps))
+    table = pd.DataFrame(rows)
+    selected = table.groupby("model").PR_AUC.mean().idxmax()
+    y_oof, p_oof = pooled[selected]
+    calibrator = LogisticRegression(random_state=RANDOM_SEED).fit(p_oof.reshape(-1, 1), y_oof)
+    calibrated = calibrator.predict_proba(p_oof.reshape(-1, 1))[:, 1]
+    threshold = _choose_threshold(y_oof, calibrated)
+    return selected, table, calibrator, threshold, classification_metrics(y_oof, calibrated >= threshold, calibrated), float(brier_score_loss(y_oof, p_oof)), y_oof, p_oof, calibrated
+
+
+def _artifact(kind, model, features, **extra):
+    return {"artifact_version": 2, "schema_version": SCHEMA_VERSION, "kind": kind, "features": list(features), "feature_dtypes": {f: ("category" if f in CATEGORICAL_FEATURES else "number") for f in features}, "model": model, **extra}
+
+
+def train(features=PRE_RELEASE_FEATURES, input_path=Path("data/processed/movies_features.csv"), output_dir=Path("models/reduced")):
+    """Select, fit, evaluate, and persist the governed production artifacts."""
+    movies = pd.read_csv(input_path, parse_dates=["release_date"]).sort_values(["release_date", "tmdb_id"])
+    development = movies[movies.release_year <= 2021].copy()
+    test = movies[movies.release_year.between(2022, 2024)].copy()
+    if test.empty: raise ValueError("Final holdout 2022-2024 is empty; collect all required years before training.")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    selected, regression_cv, residuals = _temporal_regression_selection(development, features)
+    reg_model = make_pipeline(_regressors()[selected], features).fit(development[features], np.log1p(development.worldwide_revenue_usd))
+    test_prediction = _safe_dollars(reg_model.predict(test[features]), development.worldwide_revenue_usd)
+    q = float(np.quantile(residuals, CONFORMAL_COVERAGE, method="higher"))
+    reg_artifact = _artifact("revenue_regression", reg_model, features, target_transform="log1p", prediction_cap_usd=float(development.worldwide_revenue_usd.max() * 2), conformal_coverage=CONFORMAL_COVERAGE, conformal_absolute_error_usd=q, selected_model=selected)
+
+    classifier_results, classifier_artifacts = {}, {}
+    for label, population in {
+        "profitability": development[development.profitable.notna()].assign(profitability=lambda x: x.profitable.astype(int)),
+        "blockbuster": development.assign(blockbuster=lambda x: (x.worldwide_revenue_usd > BLOCKBUSTER_THRESHOLD_USD).astype(int)),
+    }.items():
+        chosen, cv, calibrator, threshold, validation_metrics, uncalibrated_brier, y_oof, raw_oof, calibrated_oof = _temporal_classifier_selection(population, label, features)
+        final_model = make_pipeline(_classifiers()[chosen], features).fit(population[features], population[label])
+        test_population = test[test.profitable.notna()].assign(profitability=lambda x: x.profitable.astype(int)) if label == "profitability" else test.assign(blockbuster=lambda x: (x.worldwide_revenue_usd > BLOCKBUSTER_THRESHOLD_USD).astype(int))
+        raw = final_model.predict_proba(test_population[features])[:, 1]
+        prob = calibrator.predict_proba(raw.reshape(-1, 1))[:, 1]
+        classifier_results[label] = {"selected_model": chosen, "threshold": threshold, "validation_oof": validation_metrics, "validation_uncalibrated_brier": uncalibrated_brier, "test": classification_metrics(test_population[label], prob >= threshold, prob), "cv": cv.to_dict("records")}
+        classifier_artifacts[label] = _artifact(f"{label}_classification", final_model, features, calibrator=calibrator, decision_threshold=threshold, probability_label="calibrated_probability", selected_model=chosen, blockbuster_threshold_usd=BLOCKBUSTER_THRESHOLD_USD if label == "blockbuster" else None)
+        curve_rows = []
+        for status, values in (("before", raw_oof), ("after", calibrated_oof)):
+            observed, predicted = calibration_curve(y_oof, values, n_bins=8, strategy="quantile")
+            curve_rows.extend({"calibration": status, "mean_predicted": float(p), "observed_rate": float(o)} for o, p in zip(observed, predicted))
+        curve_frame = pd.DataFrame(curve_rows)
+        curve_frame.to_csv(output_dir / f"{label}_calibration_curve.csv", index=False)
+        fig, ax = plt.subplots(figsize=(6, 5))
+        for status, group in curve_frame.groupby("calibration"):
+            ax.plot(group.mean_predicted, group.observed_rate, marker="o", label=status)
+        ax.plot([0, 1], [0, 1], "--", color="gray", label="perfect")
+        ax.set(xlabel="Mean predicted probability", ylabel="Observed positive rate", title=f"{label.title()} calibration")
+        ax.legend(); fig.tight_layout(); fig.savefig(output_dir / f"{label}_calibration_curve.png", dpi=160); plt.close(fig)
+
+    median = float(development.worldwide_revenue_usd.median())
+    metrics = {"schema_version": SCHEMA_VERSION, "feature_count": len(features), "selected_revenue_model": selected, "regression_cv": regression_cv.to_dict("records"), "regression_test": regression_metrics(test.worldwide_revenue_usd, test_prediction), "regression_baseline_test": regression_metrics(test.worldwide_revenue_usd, np.repeat(median, len(test))), "conformal": {"nominal_coverage": CONFORMAL_COVERAGE, "absolute_error_usd": q, "test_empirical_coverage": float(np.mean((test.worldwide_revenue_usd >= np.maximum(0, test_prediction-q)) & (test.worldwide_revenue_usd <= test_prediction+q))), "test_average_width_usd": float(np.mean((test_prediction+q)-np.maximum(0, test_prediction-q)))}, "classification": classifier_results, "split": {"development_years": "2010-2021", "development_rows": len(development), "test_years": "2022-2024", "test_rows": len(test)}}
+    joblib.dump(reg_artifact, output_dir / "revenue_regression.joblib")
+    joblib.dump(classifier_artifacts["profitability"], output_dir / "profitability_classifier.joblib")
+    joblib.dump(classifier_artifacts["blockbuster"], output_dir / "blockbuster_classifier.joblib")
+    (output_dir / "metrics.json").write_text(json.dumps(metrics, indent=2), encoding="utf-8")
+    manifest = {"trained_at_utc": datetime.now(timezone.utc).isoformat(), "python": platform.python_version(), "packages": {"pandas": pd.__version__, "numpy": np.__version__, "scikit_learn": sklearn.__version__, "joblib": joblib.__version__}, "seed": RANDOM_SEED, "input": str(input_path), "input_rows": len(movies), "feature_count": len(features), "selected_model": selected, "split_definition": metrics["split"], "final_holdout_used_for_selection": False}
+    (output_dir / "training_manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    predictions = test[["tmdb_id", "title", "release_year", "genres", "budget_usd", "worldwide_revenue_usd"]].copy()
+    predictions["predicted_revenue_usd"] = test_prediction
+    predictions["prediction_lower_usd"] = np.maximum(0, test_prediction - q)
+    predictions["prediction_upper_usd"] = test_prediction + q
+    predictions["absolute_error_usd"] = np.abs(predictions.worldwide_revenue_usd - test_prediction)
+    bb_art = classifier_artifacts["blockbuster"]
+    bb_raw = bb_art["model"].predict_proba(test[features])[:, 1]
+    predictions["blockbuster_probability"] = bb_art["calibrator"].predict_proba(bb_raw.reshape(-1, 1))[:, 1]
+    predictions["blockbuster_actual"] = (test.worldwide_revenue_usd > BLOCKBUSTER_THRESHOLD_USD).astype(int).to_numpy()
+    predictions["blockbuster_predicted"] = (predictions.blockbuster_probability >= bb_art["decision_threshold"]).astype(int)
+    predictions.to_csv(output_dir / "test_predictions.csv", index=False)
+    def dollar_mae_score(estimator, x, actual):
+        return -mean_absolute_error(actual, _safe_dollars(estimator.predict(x), development.worldwide_revenue_usd))
+    importance = permutation_importance(reg_model, test[features], test.worldwide_revenue_usd, scoring=dollar_mae_score, n_repeats=5, random_state=RANDOM_SEED, n_jobs=-1)
+    importance_frame = pd.DataFrame({"feature": features, "mae_increase_usd_mean": importance.importances_mean, "mae_increase_usd_std": importance.importances_std}).sort_values("mae_increase_usd_mean", ascending=False)
+    importance_frame.to_csv(output_dir / "permutation_importance.csv", index=False)
+    top = importance_frame.head(12).sort_values("mae_increase_usd_mean")
+    fig, ax = plt.subplots(figsize=(8, 6)); ax.barh(top.feature, top.mae_increase_usd_mean, xerr=top.mae_increase_usd_std)
+    ax.set(xlabel="Increase in MAE after permutation (USD)", title="Holdout permutation importance")
+    fig.tight_layout(); fig.savefig(output_dir / "permutation_importance.png", dpi=160); plt.close(fig)
     print(json.dumps(metrics, indent=2))
+    return metrics
 
 
-if __name__ == "__main__":
-    train()
+if __name__ == "__main__": train()

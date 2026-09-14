@@ -10,6 +10,8 @@ import json
 from pathlib import Path
 import pandas as pd
 
+from src.merge_raw_extracts import merge_raw_extracts
+
 
 def flatten_movie(record):
     """Convert one nested TMDB response into a flat, one-row movie record.
@@ -30,7 +32,9 @@ def flatten_movie(record):
     top_cast = credits.get("cast", [])[:10]
     cast = [person.get("name") for person in top_cast if person.get("name")]
     cast_ids = [str(person.get("id")) for person in top_cast if person.get("id")]
-    directors = [person.get("name") for person in credits.get("crew", []) if person.get("job") == "Director"]
+    director_people = [person for person in credits.get("crew", []) if person.get("job") == "Director"]
+    directors = [person.get("name") for person in director_people if person.get("name")]
+    director_ids = [str(person.get("id")) for person in director_people if person.get("id")]
     collection = record.get("belongs_to_collection") or {}
     companies = record.get("production_companies", [])
     return {
@@ -44,7 +48,10 @@ def flatten_movie(record):
         "production_companies": "; ".join(c.get("name", "") for c in companies),
         "production_company_ids": "; ".join(str(c.get("id")) for c in companies if c.get("id")),
         "collection_id": collection.get("id"), "collection_name": collection.get("name"),
-        "director": directors[0] if directors else None, "cast_top10": "; ".join(cast),
+        "director": directors[0] if directors else None,
+        "director_id": director_ids[0] if director_ids else None,
+        "director_ids": "; ".join(director_ids),
+        "cast_top10": "; ".join(cast),
         "cast_ids_top10": "; ".join(cast_ids),
     }
 
@@ -68,10 +75,13 @@ def clean_movie_data(raw_dir=Path("data/raw"), output_path=Path("data/processed/
     raw_files = sorted(raw_dir.glob("tmdb_movies_*.json"))
     if not raw_files:
         raise SystemExit("No raw TMDB extract found. Run src.collect_tmdb first.")
+    extract_files = [path for path in raw_files if path.name != merged_path.name]
+    if extract_files and (not merged_path.exists() or max(path.stat().st_mtime for path in extract_files) > merged_path.stat().st_mtime):
+        merge_raw_extracts(raw_dir, merged_path)
     source_path = merged_path if merged_path.exists() else raw_files[-1]
     records = json.loads(source_path.read_text(encoding="utf-8"))
     movies = pd.DataFrame([flatten_movie(record) for record in records])
-    movies = movies.drop_duplicates("tmdb_id").copy()
+    movies = movies.dropna(subset=["tmdb_id"]).drop_duplicates("tmdb_id", keep="last").copy()
     movies["release_date"] = pd.to_datetime(movies["release_date"], errors="coerce")
     numeric_columns = ["runtime_minutes", "budget_usd", "worldwide_revenue_usd", "popularity", "vote_average", "vote_count"]
     movies[numeric_columns] = movies[numeric_columns].apply(pd.to_numeric, errors="coerce")
@@ -80,9 +90,15 @@ def clean_movie_data(raw_dir=Path("data/raw"), output_path=Path("data/processed/
     # They are kept as missing so the modeling decision is explicit and auditable.
     movies.loc[movies["budget_usd"] <= 0, "budget_usd"] = pd.NA
     movies.loc[movies["worldwide_revenue_usd"] <= 0, "worldwide_revenue_usd"] = pd.NA
+    movies.loc[movies["runtime_minutes"] <= 0, "runtime_minutes"] = pd.NA
     movies = movies[movies["release_date"].notna() & movies["worldwide_revenue_usd"].notna()].copy()
     movies["release_year"] = movies["release_date"].dt.year.astype("int64")
-    movies["profitable"] = (movies["worldwide_revenue_usd"] > movies["budget_usd"]).astype("Int64")
+    valid_profitability = movies["budget_usd"].notna() & movies["worldwide_revenue_usd"].notna()
+    movies["profitable"] = pd.Series(pd.NA, index=movies.index, dtype="Int64")
+    movies.loc[valid_profitability, "profitable"] = (
+        movies.loc[valid_profitability, "worldwide_revenue_usd"]
+        > movies.loc[valid_profitability, "budget_usd"]
+    ).astype("int64")
     output_path.parent.mkdir(parents=True, exist_ok=True)
     movies.to_csv(output_path, index=False)
     print(f"Saved {len(movies):,} cleaned movies to {output_path}")

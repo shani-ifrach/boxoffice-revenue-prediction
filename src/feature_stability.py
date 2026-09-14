@@ -9,7 +9,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
 from src.feature_ablation import make_regression_pipeline
-from src.train_model import FULL_PRE_RELEASE_FEATURES, REDUCED_PRE_RELEASE_FEATURES, add_history_from_prior_period
+from src.train_model import FULL_PRE_RELEASE_FEATURES, REDUCED_PRE_RELEASE_FEATURES
 
 
 TIME_SPLITS = [
@@ -33,7 +33,7 @@ def make_model(features):
 
 def run_stability(input_path, output_path):
     movies = pd.read_csv(input_path, parse_dates=["release_date"])
-    movies = movies[movies["budget_usd"].notna() & movies["worldwide_revenue_usd"].notna()].sort_values("release_date")
+    movies = movies[movies["worldwide_revenue_usd"].notna()].sort_values("release_date")
     rows = []
 
     for train_end, validation_start, validation_end, split_name in TIME_SPLITS:
@@ -42,9 +42,6 @@ def run_stability(input_path, output_path):
         test_data = movies[movies["release_year"] > validation_end].copy()
         if min(len(train_data), len(validation_data), len(test_data)) == 0:
             continue
-
-        validation_data = add_history_from_prior_period(validation_data, train_data)
-        test_data = add_history_from_prior_period(test_data, pd.concat([train_data, validation_data]))
 
         for model_name, features in (("full_model", FULL_PRE_RELEASE_FEATURES), ("reduced_model", REDUCED_PRE_RELEASE_FEATURES)):
             model = make_model(features)

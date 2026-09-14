@@ -93,7 +93,7 @@ def collect_movies(start_year, end_year, pages_per_year, output_dir, sort_by="po
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     raw_path = output_dir / f"tmdb_movies_{timestamp}.json"
     raw_path.write_text(json.dumps(records, ensure_ascii=False), encoding="utf-8")
-    (output_dir / "collection_metadata.json").write_text(json.dumps({
+    metadata = {
         "source": "TMDB API",
         "collected_at_utc": timestamp,
         "start_year": start_year,
@@ -101,8 +101,22 @@ def collect_movies(start_year, end_year, pages_per_year, output_dir, sort_by="po
         "pages_per_year": pages_per_year,
         "sort_by": sort_by,
         "movie_count": len(records),
+        "page_count": (end_year - start_year + 1) * pages_per_year,
+        "schema_version": "2.0",
+        "parameters": {"include_adult": False, "include_video": False, "language": "en-US"},
         "detail_endpoint": f"{BASE_URL}/movie/{{movie_id}}?append_to_response=credits",
-    }, indent=2), encoding="utf-8")
+    }
+    (output_dir / f"collection_metadata_{timestamp}.json").write_text(json.dumps(metadata, indent=2), encoding="utf-8")
+    # Compatibility index: append a compact entry instead of overwriting provenance.
+    index_path = output_dir / "collection_metadata.json"
+    try:
+        existing = json.loads(index_path.read_text(encoding="utf-8")) if index_path.exists() else []
+    except json.JSONDecodeError:
+        existing = []
+    if isinstance(existing, dict):
+        existing = [existing]
+    existing.append(metadata)
+    index_path.write_text(json.dumps(existing, indent=2), encoding="utf-8")
     print(f"Saved {len(records)} raw movie records to {raw_path}")
 
 
