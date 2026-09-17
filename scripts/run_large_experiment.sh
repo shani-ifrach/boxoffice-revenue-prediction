@@ -11,17 +11,17 @@ cd "$PROJECT_DIR"
 
 echo "[1/5] Collecting popular movies..."
 "$PYTHON_BIN" -m src.collect_tmdb \
-  --start-year 2010 --end-year 2019 --pages-per-year 15 \
+  --start-year 2010 --end-year 2024 --pages-per-year 15 \
   --sort-by popularity.desc --output-dir "$RAW_DIR"
 
 echo "[2/5] Collecting less popular movies..."
 "$PYTHON_BIN" -m src.collect_tmdb \
-  --start-year 2010 --end-year 2019 --pages-per-year 15 \
+  --start-year 2010 --end-year 2024 --pages-per-year 15 \
   --sort-by popularity.asc --output-dir "$RAW_DIR"
 
 echo "[3/5] Collecting highly voted movies..."
 "$PYTHON_BIN" -m src.collect_tmdb \
-  --start-year 2010 --end-year 2019 --pages-per-year 15 \
+  --start-year 2010 --end-year 2024 --pages-per-year 15 \
   --sort-by vote_count.desc --output-dir "$RAW_DIR"
 
 echo "[4/5] Merging raw extracts..."

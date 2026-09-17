@@ -1,0 +1,24 @@
+{
+  "reduced_pipeline": "passed",
+  "regression_metrics": {
+    "MAE": 57521066.46965944,
+    "RMSE": 155983078.6605888,
+    "R2": 0.5192908675680569
+  },
+  "classifier_metrics_unchanged": true,
+  "offline_prediction": "passed",
+  "unit_tests": 17,
+  "dashboard_unchanged": true,
+  "compile": "passed",
+  "python": "3.14.3",
+  "supported_python": ">=3.12,<3.15",
+  "remote_ci": "not executed in this session",
+  "source_control_actions": "none",
+  "calibration_evaluation": "fit diagnostics labeled; separate final-test metrics retained",
+  "interval_method": "empirical rolling-validation residual quantile; no formal guarantee",
+  "dashboard": "final workbook and active CSVs preserved",
+  "final_feature_count": 35,
+  "duplicate_csv_export": false,
+  "pipeline": "final 35-feature model; research comparisons are outside the final runtime",
+  "analysis_output_validation": "directly validates existing tables; no duplicate CSV exporter"
+}

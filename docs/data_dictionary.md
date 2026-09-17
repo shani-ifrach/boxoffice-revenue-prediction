@@ -17,22 +17,22 @@ This document describes the main analytical fields used in the cleaned and featu
 |---|---|---|
 | budget_usd | Reported production budget | Pre-release predictor, if known |
 | worldwide_revenue_usd | Reported worldwide gross revenue | Regression target and historical analysis |
-| profitable | 1 when revenue is greater than budget | Classification target |
+| profitable | 1 when revenue is greater than budget, 0 otherwise, missing when budget/revenue is invalid | Classification target |
 | roi_simple | Revenue minus budget, divided by budget | Descriptive analysis only |
 | log_budget_usd | log1p of reported budget | Retained engineered field; excluded from the production model |
 | budget_category | Budget quartile created for descriptive analysis | Dashboard grouping only |
 
-Zero budget and revenue values are treated as missing during cleaning because they commonly indicate unreported values in TMDB. Profitability is a simplified gross-over-budget proxy, not accounting profit.
+Zero budget and revenue values are treated as missing during cleaning because they commonly indicate unreported values in TMDB. Rows without revenue cannot define the target and are excluded; rows without budget remain, with nullable profitability. Profitability rates exclude those rows from both numerator and denominator. Profitability is a simplified gross-over-budget proxy, not accounting profit.
 
 ## Movie and release attributes
 
-The table also contains runtime_minutes, original_language, genres, primary_genre, genre_count, production_countries, country_count, production_companies, company_count, collection_id, is_franchise, is_sequel, cast_top10, cast_size_top10, release_month, release_season, is_summer_release, and is_holiday_release.
+The table also contains runtime_minutes, original_language, genres, primary_genre, genre_count, production_countries, country_count, production_companies, production_company_ids, company_count, collection_id, is_franchise, is_sequel, director, director_id, director_ids, cast_top10, cast_ids_top10, cast_size_top10, release_month, release_season, is_summer_release, and is_holiday_release.
 
 These fields describe the film and can be available before release, subject to the quality and timing of the TMDB record.
 
 ## Historical entity features
 
-Historical features are calculated only from earlier releases. The current movie cannot contribute its own revenue, profitability, or rating to its history.
+Historical features are calculated only from strictly earlier release dates. The current movie and every movie released on the same day are excluded from one another's history.
 
 The same pattern is used for franchise, director, cast, and production-company fields:
 

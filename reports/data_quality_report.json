@@ -1,0 +1,60 @@
+{
+  "rows": 3607,
+  "unique_tmdb_ids": 3607,
+  "duplicate_tmdb_ids": 0,
+  "year_min": 2010,
+  "year_max": 2024,
+  "missing_rates": {
+    "tmdb_id": 0.0,
+    "title": 0.0,
+    "release_date": 0.0,
+    "runtime_minutes": 0.0019406709176601053,
+    "original_language": 0.0,
+    "budget_usd": 0.2192958136955919,
+    "worldwide_revenue_usd": 0.0,
+    "popularity": 0.0,
+    "vote_average": 0.0,
+    "vote_count": 0.0,
+    "genres": 0.0016634322151372332,
+    "production_countries": 0.0047130579428888274,
+    "production_companies": 0.004158580537843083,
+    "production_company_ids": 0.004158580537843083,
+    "collection_id": 0.7493762129193235,
+    "collection_name": 0.7493762129193235,
+    "director": 0.0011089548100914888,
+    "director_id": 0.0011089548100914888,
+    "director_ids": 0.0011089548100914888,
+    "cast_top10": 0.0016634322151372332,
+    "cast_ids_top10": 0.0016634322151372332,
+    "release_year": 0.0,
+    "profitable": 0.2192958136955919
+  },
+  "valid_profitability_rows": 2816,
+  "missing_profitability_rows": 791,
+  "profitability_rate_valid_only": 0.6725852272727273,
+  "runtime_missing_after_nonpositive_rule": 7,
+  "sensitivity_counts_not_removed": {
+    "budget_below_1k": 26,
+    "budget_below_100k": 45,
+    "revenue_below_1k": 33,
+    "revenue_below_100k": 182
+  },
+  "financial_quantiles": {
+    "budget_usd": {
+      "0.01": 2000.0,
+      "0.5": 20000000.0,
+      "0.99": 250000000.0
+    },
+    "worldwide_revenue_usd": {
+      "0.01": 1291.0200000000004,
+      "0.5": 21768133.0,
+      "0.99": 1073449876.4200003
+    }
+  },
+  "missing_entity_names": {
+    "director": 4,
+    "production_companies": 15,
+    "cast_top10": 6
+  },
+  "policy": "Only non-positive reported finance values are treated as missing. Tiny positive values are flagged, not removed, because TMDB supplies no defensible universal cutoff."
+}
