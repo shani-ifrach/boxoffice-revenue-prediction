@@ -16,7 +16,7 @@ INCLUDED_DIRECTORIES = (
 )
 INCLUDED_FILES = (
     "README.md", "requirements.txt", "pyproject.toml", "dashboard/README.md",
-    ".github/workflows/ci.yml", "dashboard/tableau/boxoffice_dashboard_final_fixed.twbx",
+    ".github/workflows/ci.yml", "dashboard/tableau/boxoffice_dashboard.twbx",
 )
 
 

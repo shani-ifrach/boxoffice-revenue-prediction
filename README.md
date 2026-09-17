@@ -40,10 +40,11 @@ See [final report](reports/final_report.md) for the analysis and
 The dashboard contains **Executive Overview**, **Movie Explorer**, and
 **Revenue Model Evaluation**.
 
+**[View the interactive dashboard on Tableau Public](https://public.tableau.com/shared/GT3J6GF8N?:display_count=n&:origin=viz_share_link)**
+
 Download and open the final workbook in Tableau:
-[boxoffice_dashboard_final_fixed.twbx](dashboard/tableau/boxoffice_dashboard_final_fixed.twbx).
+[boxoffice_dashboard.twbx](dashboard/tableau/boxoffice_dashboard.twbx).
 See [dashboard guide](dashboard/README.md) for the pages and interpretation.
-The project has not been published to Tableau Public.
 
 The pipeline produces cleaned data, evaluation tables and charts. The final
 workbook and its active CSV sources are preserved when the pipeline runs.

@@ -39,7 +39,7 @@ history and saved revenue/blockbuster models. Outcomes present in the example
 record are discarded when building current-film model inputs.
 
 The final dashboard can be opened independently in Tableau:
-`dashboard/tableau/boxoffice_dashboard_final_fixed.twbx`.
+`dashboard/tableau/boxoffice_dashboard.twbx`.
 
 ## Reconstruct the complete pipeline
 

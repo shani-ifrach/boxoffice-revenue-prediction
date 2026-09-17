@@ -1,6 +1,6 @@
 # Final dashboard QA
 
-Final workbook: `dashboard/tableau/boxoffice_dashboard_final_fixed.twbx`.
+Final workbook: `dashboard/tableau/boxoffice_dashboard.twbx`.
 Pages: Executive Overview, Movie Explorer and Revenue Model Evaluation.
 
 The completed QA record includes movie selection, duplicate-title year labels,
@@ -13,4 +13,4 @@ predictions, evaluation metrics, classifier thresholds and interval widths were
 reproduced. Saved interval labels use “90% Forecast Range” and “90% interval”.
 No formal split-conformal claim is displayed in those labels.
 
-The project has not been published to Tableau Public.
+Published dashboard: [View on Tableau Public](https://public.tableau.com/shared/GT3J6GF8N?:display_count=n&:origin=viz_share_link).
