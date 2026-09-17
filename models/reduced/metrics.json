@@ -1,0 +1,345 @@
+{
+  "schema_version": "2.0",
+  "feature_count": 35,
+  "selected_revenue_model": "random_forest",
+  "regression_cv": [
+    {
+      "model": "ridge",
+      "train_end": 2015,
+      "validation_years": "2016-2017",
+      "train_rows": 1613,
+      "validation_rows": 515,
+      "MAE": 153203457.01675415,
+      "RMSE": 500805718.3032322,
+      "R2": -4.108350104176135
+    },
+    {
+      "model": "ridge",
+      "train_end": 2017,
+      "validation_years": "2018-2019",
+      "train_rows": 2128,
+      "validation_rows": 488,
+      "MAE": 142534443.67743292,
+      "RMSE": 448225874.7552711,
+      "R2": -1.635861186175822
+    },
+    {
+      "model": "ridge",
+      "train_end": 2019,
+      "validation_years": "2020-2021",
+      "train_rows": 2616,
+      "validation_rows": 373,
+      "MAE": 104814271.65440974,
+      "RMSE": 471299569.846455,
+      "R2": -9.15410223149202
+    },
+    {
+      "model": "random_forest",
+      "train_end": 2015,
+      "validation_years": "2016-2017",
+      "train_rows": 1613,
+      "validation_rows": 515,
+      "MAE": 59033471.56137537,
+      "RMSE": 128811941.76860724,
+      "R2": 0.6620485219929158
+    },
+    {
+      "model": "random_forest",
+      "train_end": 2017,
+      "validation_years": "2018-2019",
+      "train_rows": 2128,
+      "validation_rows": 488,
+      "MAE": 66241042.32110345,
+      "RMSE": 165950612.3687623,
+      "R2": 0.6386846546774765
+    },
+    {
+      "model": "random_forest",
+      "train_end": 2019,
+      "validation_years": "2020-2021",
+      "train_rows": 2616,
+      "validation_rows": 373,
+      "MAE": 39769736.1196054,
+      "RMSE": 101409980.6066118,
+      "R2": 0.5298798737264621
+    },
+    {
+      "model": "gradient_boosting",
+      "train_end": 2015,
+      "validation_years": "2016-2017",
+      "train_rows": 1613,
+      "validation_rows": 515,
+      "MAE": 63549517.287317574,
+      "RMSE": 138498523.81577545,
+      "R2": 0.6093099192032942
+    },
+    {
+      "model": "gradient_boosting",
+      "train_end": 2017,
+      "validation_years": "2018-2019",
+      "train_rows": 2128,
+      "validation_rows": 488,
+      "MAE": 68375513.24187404,
+      "RMSE": 181628264.93329006,
+      "R2": 0.5671917240545068
+    },
+    {
+      "model": "gradient_boosting",
+      "train_end": 2019,
+      "validation_years": "2020-2021",
+      "train_rows": 2616,
+      "validation_rows": 373,
+      "MAE": 39249516.8883981,
+      "RMSE": 104878035.72670645,
+      "R2": 0.4971753795959988
+    }
+  ],
+  "regression_test": {
+    "MAE": 57521066.46965944,
+    "RMSE": 155983078.6605888,
+    "R2": 0.5192908675680569
+  },
+  "regression_baseline_test": {
+    "MAE": 94208752.95469256,
+    "RMSE": 237382817.98370335,
+    "R2": -0.11333524896796732
+  },
+  "conformal": {
+    "method": "rolling_validation_residual_quantile",
+    "coverage_guarantee": false,
+    "nominal_coverage": 0.9,
+    "absolute_error_usd": 152957795.87692055,
+    "test_empirical_coverage": 0.9029126213592233,
+    "test_average_width_usd": 185513986.87550843
+  },
+  "classification": {
+    "profitability": {
+      "selected_model": "logistic_regression",
+      "threshold": 0.5249999999999999,
+      "calibration_fit": {
+        "accuracy": 0.7006673021925643,
+        "precision": 0.7551020408163265,
+        "recall": 0.8055152394775036,
+        "F1": 0.7794943820224719,
+        "ROC_AUC": 0.7472625383002742,
+        "PR_AUC": 0.849812697927303,
+        "Brier": 0.1890993353125093,
+        "confusion_matrix": {
+          "tn": 180,
+          "fp": 180,
+          "fn": 134,
+          "tp": 555
+        }
+      },
+      "calibration_evaluation": "in-sample for calibrator; base predictions are temporal out-of-fold",
+      "threshold_selection": "development validation only; 0.005-step grid over [0, 1]",
+      "validation_uncalibrated_brier": 0.20431709492212152,
+      "test": {
+        "accuracy": 0.6457883369330454,
+        "precision": 0.7532467532467533,
+        "recall": 0.6192170818505338,
+        "F1": 0.6796875,
+        "ROC_AUC": 0.7130538500645263,
+        "PR_AUC": 0.810405679945002,
+        "Brier": 0.20788623144241458,
+        "confusion_matrix": {
+          "tn": 125,
+          "fp": 57,
+          "fn": 107,
+          "tp": 174
+        }
+      },
+      "cv": [
+        {
+          "model": "logistic_regression",
+          "train_end": 2015,
+          "validation_years": "2016-2017",
+          "PR_AUC": 0.9008334937959007,
+          "ROC_AUC": 0.7762608695652173,
+          "Brier": 0.19085953765619987
+        },
+        {
+          "model": "logistic_regression",
+          "train_end": 2017,
+          "validation_years": "2018-2019",
+          "PR_AUC": 0.8690825332162462,
+          "ROC_AUC": 0.7409733124018839,
+          "Brier": 0.2022774093966628
+        },
+        {
+          "model": "logistic_regression",
+          "train_end": 2019,
+          "validation_years": "2020-2021",
+          "PR_AUC": 0.6820501471401283,
+          "ROC_AUC": 0.7071018062397373,
+          "Brier": 0.23069909075409387
+        },
+        {
+          "model": "random_forest",
+          "train_end": 2015,
+          "validation_years": "2016-2017",
+          "PR_AUC": 0.8845779093652877,
+          "ROC_AUC": 0.7479130434782608,
+          "Brier": 0.186244894428844
+        },
+        {
+          "model": "random_forest",
+          "train_end": 2017,
+          "validation_years": "2018-2019",
+          "PR_AUC": 0.8833026475864729,
+          "ROC_AUC": 0.7698771816418875,
+          "Brier": 0.17471413089228302
+        },
+        {
+          "model": "random_forest",
+          "train_end": 2019,
+          "validation_years": "2020-2021",
+          "PR_AUC": 0.6600111095919553,
+          "ROC_AUC": 0.6833607006020798,
+          "Brier": 0.23485760298983605
+        },
+        {
+          "model": "gradient_boosting",
+          "train_end": 2015,
+          "validation_years": "2016-2017",
+          "PR_AUC": 0.8905316676846702,
+          "ROC_AUC": 0.761449275362319,
+          "Brier": 0.1666786621463859
+        },
+        {
+          "model": "gradient_boosting",
+          "train_end": 2017,
+          "validation_years": "2018-2019",
+          "PR_AUC": 0.8809628439501214,
+          "ROC_AUC": 0.7516237264136425,
+          "Brier": 0.17926512849789616
+        },
+        {
+          "model": "gradient_boosting",
+          "train_end": 2019,
+          "validation_years": "2020-2021",
+          "PR_AUC": 0.6348305505878933,
+          "ROC_AUC": 0.6697112753147236,
+          "Brier": 0.270556688974254
+        }
+      ]
+    },
+    "blockbuster": {
+      "selected_model": "gradient_boosting",
+      "threshold": 0.065,
+      "calibration_fit": {
+        "accuracy": 0.9375,
+        "precision": 0.5347222222222222,
+        "recall": 0.8020833333333334,
+        "F1": 0.6416666666666667,
+        "ROC_AUC": 0.9489298502604167,
+        "PR_AUC": 0.7178088802672608,
+        "Brier": 0.03261697875638315,
+        "confusion_matrix": {
+          "tn": 1213,
+          "fp": 67,
+          "fn": 19,
+          "tp": 77
+        }
+      },
+      "calibration_evaluation": "in-sample for calibrator; base predictions are temporal out-of-fold",
+      "threshold_selection": "development validation only; 0.005-step grid over [0, 1]",
+      "validation_uncalibrated_brier": 0.03414405071311519,
+      "test": {
+        "accuracy": 0.9498381877022654,
+        "precision": 0.5964912280701754,
+        "recall": 0.8095238095238095,
+        "F1": 0.6868686868686869,
+        "ROC_AUC": 0.9816468253968254,
+        "PR_AUC": 0.7657810344760414,
+        "Brier": 0.03386862588315975,
+        "confusion_matrix": {
+          "tn": 553,
+          "fp": 23,
+          "fn": 8,
+          "tp": 34
+        }
+      },
+      "cv": [
+        {
+          "model": "logistic_regression",
+          "train_end": 2015,
+          "validation_years": "2016-2017",
+          "PR_AUC": 0.6999574146279081,
+          "ROC_AUC": 0.9238081451457247,
+          "Brier": 0.08542137036134834
+        },
+        {
+          "model": "logistic_regression",
+          "train_end": 2017,
+          "validation_years": "2018-2019",
+          "PR_AUC": 0.7795891943427606,
+          "ROC_AUC": 0.9607675175603907,
+          "Brier": 0.08748071997183217
+        },
+        {
+          "model": "logistic_regression",
+          "train_end": 2019,
+          "validation_years": "2020-2021",
+          "PR_AUC": 0.44943213893400036,
+          "ROC_AUC": 0.9658119658119658,
+          "Brier": 0.08412138060731858
+        },
+        {
+          "model": "random_forest",
+          "train_end": 2015,
+          "validation_years": "2016-2017",
+          "PR_AUC": 0.7072861168199638,
+          "ROC_AUC": 0.9233014861995754,
+          "Brier": 0.06306557267921092
+        },
+        {
+          "model": "random_forest",
+          "train_end": 2017,
+          "validation_years": "2018-2019",
+          "PR_AUC": 0.7902357414016364,
+          "ROC_AUC": 0.9605390897150362,
+          "Brier": 0.052247417475404935
+        },
+        {
+          "model": "random_forest",
+          "train_end": 2019,
+          "validation_years": "2020-2021",
+          "PR_AUC": 0.5391550555826021,
+          "ROC_AUC": 0.9705128205128205,
+          "Brier": 0.05001988208103002
+        },
+        {
+          "model": "gradient_boosting",
+          "train_end": 2015,
+          "validation_years": "2016-2017",
+          "PR_AUC": 0.7156136939070984,
+          "ROC_AUC": 0.9351235282763944,
+          "Brier": 0.039893656948258534
+        },
+        {
+          "model": "gradient_boosting",
+          "train_end": 2017,
+          "validation_years": "2018-2019",
+          "PR_AUC": 0.8139428038340516,
+          "ROC_AUC": 0.9670778367883045,
+          "Brier": 0.032477146067529626
+        },
+        {
+          "model": "gradient_boosting",
+          "train_end": 2019,
+          "validation_years": "2020-2021",
+          "PR_AUC": 0.5891464091464091,
+          "ROC_AUC": 0.9682692307692308,
+          "Brier": 0.02838641601056003
+        }
+      ]
+    }
+  },
+  "split": {
+    "development_years": "2010-2021",
+    "development_rows": 2989,
+    "test_years": "2022-2024",
+    "test_rows": 618
+  }
+}

@@ -1,0 +1,2 @@
+model_name,movie_count,test_period,test_mae_usd,baseline_mae_usd,mae_improvement_pct,interval_coverage,blockbuster_threshold_usd,blockbuster_decision_threshold
+random_forest,3607,2022-2024,57521066.469659515,94208752.95469256,38.942970089708226,0.9029126213592233,400000000,0.065

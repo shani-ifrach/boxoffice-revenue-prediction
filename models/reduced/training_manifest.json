@@ -1,0 +1,22 @@
+{
+  "trained_at_utc": "2026-09-16T20:25:39.934182+00:00",
+  "python": "3.14.3",
+  "packages": {
+    "pandas": "2.3.3",
+    "numpy": "2.5.2",
+    "scikit_learn": "1.9.0",
+    "joblib": "1.6.0"
+  },
+  "seed": 42,
+  "input": "data/processed/movies_features.csv",
+  "input_rows": 3607,
+  "feature_count": 35,
+  "selected_model": "random_forest",
+  "split_definition": {
+    "development_years": "2010-2021",
+    "development_rows": 2989,
+    "test_years": "2022-2024",
+    "test_rows": 618
+  },
+  "final_holdout_used_for_selection": false
+}

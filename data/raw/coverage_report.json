@@ -1,0 +1,62 @@
+{
+  "generated_at_utc": "2026-09-14T09:32:42.047104+00:00",
+  "source_files": [
+    {
+      "source_file": "tmdb_movies_20260904T204600Z.json",
+      "row_count": 2759,
+      "collected_at_utc": "20260904T204600Z",
+      "start_year_observed": 2010,
+      "end_year_observed": 2019,
+      "collection_strategy": "unknown_legacy_extract",
+      "schema_version": "legacy"
+    },
+    {
+      "source_file": "tmdb_movies_20260904T210509Z.json",
+      "row_count": 3000,
+      "collected_at_utc": "20260904T210509Z",
+      "start_year_observed": 2010,
+      "end_year_observed": 2019,
+      "collection_strategy": "unknown_legacy_extract",
+      "schema_version": "legacy"
+    },
+    {
+      "source_file": "tmdb_movies_20260904T212105Z.json",
+      "row_count": 3000,
+      "collected_at_utc": "20260904T212105Z",
+      "start_year_observed": 2010,
+      "end_year_observed": 2019,
+      "collection_strategy": "unknown_legacy_extract",
+      "schema_version": "legacy"
+    },
+    {
+      "source_file": "tmdb_movies_20260904T213538Z.json",
+      "row_count": 1454,
+      "collected_at_utc": "20260904T213538Z",
+      "start_year_observed": 2020,
+      "end_year_observed": 2024,
+      "collection_strategy": "unknown_legacy_extract",
+      "schema_version": "legacy"
+    },
+    {
+      "source_file": "tmdb_movies_20260904T214534Z.json",
+      "row_count": 1499,
+      "collected_at_utc": "20260904T214534Z",
+      "start_year_observed": 2020,
+      "end_year_observed": 2024,
+      "collection_strategy": "unknown_legacy_extract",
+      "schema_version": "legacy"
+    },
+    {
+      "source_file": "tmdb_movies_20260904T215351Z.json",
+      "row_count": 1500,
+      "collected_at_utc": "20260904T215351Z",
+      "start_year_observed": 2020,
+      "end_year_observed": 2024,
+      "collection_strategy": "unknown_legacy_extract",
+      "schema_version": "legacy"
+    }
+  ],
+  "source_record_count": 13212,
+  "unique_movie_count": 10336,
+  "duplicate_movie_count": 2876
+}

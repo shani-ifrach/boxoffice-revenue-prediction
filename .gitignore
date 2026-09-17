@@ -12,3 +12,26 @@ models/*
 backups/
 experiments/
 *.log
+# Final processed data and model artifacts
+!data/processed/movies_clean.csv
+!data/processed/movies_features.csv
+!data/raw/collection_metadata.json
+!data/raw/coverage_report.json
+!data/raw/duplicate_report.csv
+!models/reduced/
+
+# Local delivery files
+/dist/
+*.twbr
+
+# Keep only the final dashboard workbook
+/dashboard/tableau/*.twbx
+!/dashboard/tableau/boxoffice_dashboard.twbx
+
+# Superseded experiments and internal preparation
+/src/archive/
+/scripts/run_large_experiment.sh
+/reports/baseline_20260914.md
+/reports/submission_readiness_audit.md
+/notes/*
+!/notes/decision_log.md

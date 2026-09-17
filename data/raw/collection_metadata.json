@@ -1,0 +1,10 @@
+{
+  "source": "TMDB API",
+  "collected_at_utc": "20260904T215351Z",
+  "start_year": 2020,
+  "end_year": 2024,
+  "pages_per_year": 15,
+  "sort_by": "vote_count.desc",
+  "movie_count": 1500,
+  "detail_endpoint": "https://api.themoviedb.org/3/movie/{movie_id}?append_to_response=credits"
+}

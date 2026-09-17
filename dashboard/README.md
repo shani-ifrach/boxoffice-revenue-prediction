@@ -1,11 +1,38 @@
-# Power BI dashboard specification
+# Tableau dashboard
 
-The `.pbix` file is intentionally not generated automatically. After running the pipeline, import `data/processed/movies_features.csv` and `models/metrics.json` (flattened to a table) into Power BI.
+The dashboard presents financial patterns, individual-film comparisons and
+forecast performance using the project’s cleaned data and model outputs.
 
-## Pages
+Open [boxoffice_dashboard_final_fixed.twbx](tableau/boxoffice_dashboard_final_fixed.twbx).
+This is the final portfolio artifact. Other workbook files are earlier versions.
+The dashboard has not been published to Tableau Public.
 
-1. **Executive Overview:** movie count, average/median revenue, average budget, median ROI, profitability rate, yearly revenue trend, revenue by genre, budget vs revenue, and a revenue distribution.
-2. **Movie Performance:** top revenue titles, top simple-ROI titles with a minimum budget filter, genre/season comparisons, and sample sizes.
-3. **Prediction:** input controls matching `src/predict.py`; show predicted revenue, profitability probability, and a note that predictions are estimates from a historical model.
+## Final pages
 
-Include TMDB attribution in an About/Credits section and label the profitability measure as “gross revenue > reported production budget,” not accounting profit.
+- **Executive Overview:** dataset-level financial patterns and summary indicators.
+- **Movie Explorer:** individual-film performance, saved model outputs and comparisons.
+- **Revenue Model Evaluation:** actual versus predicted revenue and model errors.
+
+The separate $400M classifier is documented in the model report; no additional
+Blockbuster Risk page is required for the final dashboard.
+
+## Reading the dashboard
+
+Worldwide revenue means TMDB reported worldwide gross. Gross-over-budget
+profitability compares reported gross with production budget; it is not accounting
+profit. Net return multiple is `(revenue - budget) / budget` and excludes unknown
+budgets. Blockbuster means revenue strictly above $400M.
+
+Saved model-quality predictions cover 2022–2024 evaluation movies. An unscored film
+has no saved test prediction; it must not be displayed as a zero-dollar forecast.
+Peer comparisons based on observed outcomes are retrospective. Historical ratings,
+ROI, votes and popularity are descriptive fields, rather than current-film model inputs.
+
+## Data sources
+
+`tableau/data` contains the saved dashboard sources. The final analysis pipeline
+produces cleaned data, model predictions and error tables directly in
+`data/processed`, `models/reduced` and `reports`. It preserves the delivered
+workbook and its active sources. See [data contract](../docs/tableau_data_contract.md).
+
+Attribution: “This product uses the TMDB API but is not endorsed or certified by TMDB.”

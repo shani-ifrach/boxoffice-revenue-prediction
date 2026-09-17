@@ -1,0 +1,13 @@
+task,model,split,MAE_usd,RMSE_usd,R2,accuracy_pct,precision_pct,recall_pct,F1_pct,ROC_AUC_pct,threshold,PR_AUC_pct,Brier
+Regression,ridge,validation_2016-2017,153203457.0168,500805718.3032,-4.1084,,,,,,,,
+Regression,ridge,validation_2018-2019,142534443.6774,448225874.7553,-1.6359,,,,,,,,
+Regression,ridge,validation_2020-2021,104814271.6544,471299569.8465,-9.1541,,,,,,,,
+Regression,random_forest,validation_2016-2017,59033471.5614,128811941.7686,0.662,,,,,,,,
+Regression,random_forest,validation_2018-2019,66241042.3211,165950612.3688,0.6387,,,,,,,,
+Regression,random_forest,validation_2020-2021,39769736.1196,101409980.6066,0.5299,,,,,,,,
+Regression,gradient_boosting,validation_2016-2017,63549517.2873,138498523.8158,0.6093,,,,,,,,
+Regression,gradient_boosting,validation_2018-2019,68375513.2419,181628264.9333,0.5672,,,,,,,,
+Regression,gradient_boosting,validation_2020-2021,39249516.8884,104878035.7267,0.4972,,,,,,,,
+Regression,random_forest,final_test,57521066.4697,155983078.6606,0.5193,,,,,,,,
+Profitability,logistic_regression,final_test,,,,64.5788,75.3247,61.9217,67.9688,71.3054,0.525,81.0406,0.2079
+Blockbuster,gradient_boosting,final_test,,,,94.9838,59.6491,80.9524,68.6869,98.1647,0.065,76.5781,0.0339
