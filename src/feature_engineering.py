@@ -17,7 +17,8 @@ def _items(value):
 def add_static_features(frame):
     movies = frame.copy()
     for column in ("budget_usd", "runtime_minutes", "worldwide_revenue_usd", "vote_average"):
-        if column in movies: movies[column] = pd.to_numeric(movies[column], errors="coerce")
+        if column in movies:
+            movies[column] = pd.to_numeric(movies[column], errors="coerce").astype("float64")
     movies["release_date"] = pd.to_datetime(movies["release_date"], errors="coerce")
     if movies["release_date"].isna().any():
         raise ValueError("Every feature row requires a valid release_date.")

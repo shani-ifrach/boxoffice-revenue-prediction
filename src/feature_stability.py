@@ -1,11 +1,9 @@
-"""Check whether the reduced feature contract remains better across time splits."""
+"""Compare feature contracts on development-period temporal validation only."""
 import argparse
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.pipeline import Pipeline
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
 from src.feature_ablation import make_regression_pipeline
@@ -34,24 +32,25 @@ def make_model(features):
 def run_stability(input_path, output_path):
     movies = pd.read_csv(input_path, parse_dates=["release_date"])
     movies = movies[movies["worldwide_revenue_usd"].notna()].sort_values("release_date")
+    movies = movies[movies["release_year"] <= 2021]
     rows = []
 
     for train_end, validation_start, validation_end, split_name in TIME_SPLITS:
         train_data = movies[movies["release_year"] <= train_end].copy()
         validation_data = movies[movies["release_year"].between(validation_start, validation_end)].copy()
-        test_data = movies[movies["release_year"] > validation_end].copy()
-        if min(len(train_data), len(validation_data), len(test_data)) == 0:
-            continue
+        if train_data.empty or validation_data.empty:
+            raise ValueError(f"Empty training/validation population for {split_name}.")
 
         for model_name, features in (("full_model", FULL_PRE_RELEASE_FEATURES), ("reduced_model", REDUCED_PRE_RELEASE_FEATURES)):
             model = make_model(features)
             model.fit(train_data[features], np.log1p(train_data["worldwide_revenue_usd"]))
             validation_prediction = np.maximum(0, np.expm1(model.predict(validation_data[features])))
-            test_prediction = np.maximum(0, np.expm1(model.predict(test_data[features])))
-            for period, actual, prediction in (("validation", validation_data["worldwide_revenue_usd"], validation_prediction), ("test", test_data["worldwide_revenue_usd"], test_prediction)):
-                row = {"split": split_name, "train_end_year": train_end, "validation_years": f"{validation_start}-{validation_end}", "test_start_year": validation_end + 1, "period": period, "model": model_name, "train_rows": len(train_data), "validation_rows": len(validation_data), "test_rows": len(test_data)}
-                row.update(score(actual, prediction))
-                rows.append(row)
+            row = {"split": split_name, "train_end_year": train_end,
+                   "validation_years": f"{validation_start}-{validation_end}",
+                   "period": "validation", "model": model_name,
+                   "train_rows": len(train_data), "validation_rows": len(validation_data)}
+            row.update(score(validation_data["worldwide_revenue_usd"], validation_prediction))
+            rows.append(row)
 
     results = pd.DataFrame(rows)
     output_path.parent.mkdir(parents=True, exist_ok=True)

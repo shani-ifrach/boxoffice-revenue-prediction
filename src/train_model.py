@@ -21,7 +21,7 @@ from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.calibration import calibration_curve
 from sklearn.inspection import permutation_importance
 
-from src.config import BLOCKBUSTER_THRESHOLD_USD, CONFORMAL_COVERAGE, RANDOM_SEED, SCHEMA_VERSION
+from src.config import BLOCKBUSTER_THRESHOLD_USD, INTERVAL_NOMINAL_COVERAGE, RANDOM_SEED, SCHEMA_VERSION
 from src.feature_engineering import add_historical_features
 
 FULL_PRE_RELEASE_FEATURES = ["budget_usd", "log_budget_usd", "runtime_minutes", "release_year", "release_month", "release_season", "primary_genre", "original_language", "genre_count", "country_count", "company_count", "cast_size_top10", "is_franchise", "is_sequel", "is_summer_release", "is_holiday_release", "franchise_previous_movie_count", "franchise_previous_avg_revenue", "franchise_previous_last_revenue", "franchise_previous_max_revenue", "franchise_previous_median_revenue", "franchise_previous_success_rate", "franchise_previous_latest_success", "franchise_previous_avg_rating", "director_previous_movie_count", "director_previous_avg_revenue", "director_previous_max_revenue", "director_previous_success_rate", "director_previous_avg_rating", "production_company_previous_movie_count", "production_company_previous_avg_revenue", "production_company_previous_max_revenue", "production_company_previous_success_rate", "cast_previous_movie_count", "cast_previous_avg_revenue", "cast_previous_max_revenue", "cast_previous_success_rate", "cast_previous_avg_rating"]
@@ -86,11 +86,25 @@ def _safe_dollars(log_predictions, training_revenue):
 
 
 def _choose_threshold(actual, probability, minimum_recall=0.80):
-    candidates = np.linspace(0.05, 0.95, 181)
+    """Tune a 0.005-step grid over the entire probability range on validation."""
+    actual = np.asarray(actual)
+    probability = np.asarray(probability, dtype=float)
+    if actual.ndim != 1 or probability.shape != actual.shape or not len(actual):
+        raise ValueError("Threshold selection requires matching non-empty vectors.")
+    if not np.isin(actual, [0, 1]).all() or not np.any(actual == 1):
+        raise ValueError("Threshold selection requires binary labels and positives.")
+    if not np.isfinite(probability).all() or ((probability < 0) | (probability > 1)).any():
+        raise ValueError("Probabilities must be finite and between 0 and 1.")
+    if not 0 < minimum_recall <= 1:
+        raise ValueError("minimum_recall must be between 0 (exclusive) and 1.")
+    # Preserve the existing grid values and add the previously omitted ends.
+    candidates = np.concatenate([np.linspace(0, 0.045, 10),
+                                 np.linspace(0.05, 0.95, 181),
+                                 np.linspace(0.955, 1, 10)])
     eligible = [t for t in candidates if recall_score(actual, probability >= t, zero_division=0) >= minimum_recall]
     if eligible:
         return float(max(eligible, key=lambda t: (precision_score(actual, probability >= t, zero_division=0), f1_score(actual, probability >= t, zero_division=0))))
-    return float(max(candidates, key=lambda t: f1_score(actual, probability >= t, zero_division=0)))
+    raise ValueError("No threshold meets the requested recall.")
 
 
 def _temporal_regression_selection(data, features):
@@ -146,8 +160,9 @@ def train(features=PRE_RELEASE_FEATURES, input_path=Path("data/processed/movies_
     selected, regression_cv, residuals = _temporal_regression_selection(development, features)
     reg_model = make_pipeline(_regressors()[selected], features).fit(development[features], np.log1p(development.worldwide_revenue_usd))
     test_prediction = _safe_dollars(reg_model.predict(test[features]), development.worldwide_revenue_usd)
-    q = float(np.quantile(residuals, CONFORMAL_COVERAGE, method="higher"))
-    reg_artifact = _artifact("revenue_regression", reg_model, features, target_transform="log1p", prediction_cap_usd=float(development.worldwide_revenue_usd.max() * 2), conformal_coverage=CONFORMAL_COVERAGE, conformal_absolute_error_usd=q, selected_model=selected)
+    q = float(np.quantile(residuals, INTERVAL_NOMINAL_COVERAGE, method="higher"))
+    # An empirical rolling-validation residual interval, not split-conformal.
+    reg_artifact = _artifact("revenue_regression", reg_model, features, target_transform="log1p", prediction_cap_usd=float(development.worldwide_revenue_usd.max() * 2), conformal_coverage=INTERVAL_NOMINAL_COVERAGE, conformal_absolute_error_usd=q, interval_method="rolling_validation_residual_quantile", selected_model=selected)
 
     classifier_results, classifier_artifacts = {}, {}
     for label, population in {
@@ -159,23 +174,30 @@ def train(features=PRE_RELEASE_FEATURES, input_path=Path("data/processed/movies_
         test_population = test[test.profitable.notna()].assign(profitability=lambda x: x.profitable.astype(int)) if label == "profitability" else test.assign(blockbuster=lambda x: (x.worldwide_revenue_usd > BLOCKBUSTER_THRESHOLD_USD).astype(int))
         raw = final_model.predict_proba(test_population[features])[:, 1]
         prob = calibrator.predict_proba(raw.reshape(-1, 1))[:, 1]
-        classifier_results[label] = {"selected_model": chosen, "threshold": threshold, "validation_oof": validation_metrics, "validation_uncalibrated_brier": uncalibrated_brier, "test": classification_metrics(test_population[label], prob >= threshold, prob), "cv": cv.to_dict("records")}
+        classifier_results[label] = {"selected_model": chosen, "threshold": threshold,
+            "calibration_fit": validation_metrics,
+            "calibration_evaluation": "in-sample for calibrator; base predictions are temporal out-of-fold",
+            "threshold_selection": "development validation only; 0.005-step grid over [0, 1]",
+            "validation_uncalibrated_brier": uncalibrated_brier,
+            "test": classification_metrics(test_population[label], prob >= threshold, prob), "cv": cv.to_dict("records")}
         classifier_artifacts[label] = _artifact(f"{label}_classification", final_model, features, calibrator=calibrator, decision_threshold=threshold, probability_label="calibrated_probability", selected_model=chosen, blockbuster_threshold_usd=BLOCKBUSTER_THRESHOLD_USD if label == "blockbuster" else None)
         curve_rows = []
         for status, values in (("before", raw_oof), ("after", calibrated_oof)):
             observed, predicted = calibration_curve(y_oof, values, n_bins=8, strategy="quantile")
-            curve_rows.extend({"calibration": status, "mean_predicted": float(p), "observed_rate": float(o)} for o, p in zip(observed, predicted))
+            curve_rows.extend({"calibration": status, "evaluation_population": "calibrator_fit",
+                "mean_predicted": float(p), "observed_rate": float(o)} for o, p in zip(observed, predicted))
         curve_frame = pd.DataFrame(curve_rows)
         curve_frame.to_csv(output_dir / f"{label}_calibration_curve.csv", index=False)
         fig, ax = plt.subplots(figsize=(6, 5))
         for status, group in curve_frame.groupby("calibration"):
             ax.plot(group.mean_predicted, group.observed_rate, marker="o", label=status)
         ax.plot([0, 1], [0, 1], "--", color="gray", label="perfect")
-        ax.set(xlabel="Mean predicted probability", ylabel="Observed positive rate", title=f"{label.title()} calibration")
+        ax.set(xlabel="Mean predicted probability", ylabel="Observed positive rate",
+               title=f"{label.title()} calibration (fit population)")
         ax.legend(); fig.tight_layout(); fig.savefig(output_dir / f"{label}_calibration_curve.png", dpi=160); plt.close(fig)
 
     median = float(development.worldwide_revenue_usd.median())
-    metrics = {"schema_version": SCHEMA_VERSION, "feature_count": len(features), "selected_revenue_model": selected, "regression_cv": regression_cv.to_dict("records"), "regression_test": regression_metrics(test.worldwide_revenue_usd, test_prediction), "regression_baseline_test": regression_metrics(test.worldwide_revenue_usd, np.repeat(median, len(test))), "conformal": {"nominal_coverage": CONFORMAL_COVERAGE, "absolute_error_usd": q, "test_empirical_coverage": float(np.mean((test.worldwide_revenue_usd >= np.maximum(0, test_prediction-q)) & (test.worldwide_revenue_usd <= test_prediction+q))), "test_average_width_usd": float(np.mean((test_prediction+q)-np.maximum(0, test_prediction-q)))}, "classification": classifier_results, "split": {"development_years": "2010-2021", "development_rows": len(development), "test_years": "2022-2024", "test_rows": len(test)}}
+    metrics = {"schema_version": SCHEMA_VERSION, "feature_count": len(features), "selected_revenue_model": selected, "regression_cv": regression_cv.to_dict("records"), "regression_test": regression_metrics(test.worldwide_revenue_usd, test_prediction), "regression_baseline_test": regression_metrics(test.worldwide_revenue_usd, np.repeat(median, len(test))), "conformal": {"method": "rolling_validation_residual_quantile", "coverage_guarantee": False, "nominal_coverage": INTERVAL_NOMINAL_COVERAGE, "absolute_error_usd": q, "test_empirical_coverage": float(np.mean((test.worldwide_revenue_usd >= np.maximum(0, test_prediction-q)) & (test.worldwide_revenue_usd <= test_prediction+q))), "test_average_width_usd": float(np.mean((test_prediction+q)-np.maximum(0, test_prediction-q)))}, "classification": classifier_results, "split": {"development_years": "2010-2021", "development_rows": len(development), "test_years": "2022-2024", "test_rows": len(test)}}
     joblib.dump(reg_artifact, output_dir / "revenue_regression.joblib")
     joblib.dump(classifier_artifacts["profitability"], output_dir / "profitability_classifier.joblib")
     joblib.dump(classifier_artifacts["blockbuster"], output_dir / "blockbuster_classifier.joblib")
