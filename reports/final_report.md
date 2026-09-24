@@ -33,7 +33,7 @@ retrained through 2021 and evaluated on 2022–2024.
 | RMSE | $156.0M | $237.4M |
 | R² | 0.519 | -0.113 |
 
-MAE improved 39.0%. Error remains concentrated in the upper tail:
+MAE improved 38.9%. Error remains concentrated in the upper tail:
 
 | Actual revenue band | n | MAE | Interval coverage |
 |---|---:|---:|---:|
@@ -41,7 +41,7 @@ MAE improved 39.0%. Error remains concentrated in the upper tail:
 | High Grossing, $250M–$400M | 26 | $172.1M | 38.5% |
 | Blockbuster, above $400M | 42 | $380.2M | 28.6% |
 
-The nominal 90% empirical rolling-residual interval has 90.3% overall holdout coverage and $185.5M average
+The nominal 90% empirical rolling-residual interval has 90.3% overall evaluation coverage and $185.5M average
 clipped width. Segment results show that overall coverage masks poor tail coverage;
 the interval represents empirical model error, not a guarantee. It pools residuals
 from multiple validation models and is not a standard split-conformal implementation.

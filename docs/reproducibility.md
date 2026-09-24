@@ -7,15 +7,15 @@ already passed.
 
 ## What is included in the repository
 
-- Current Python source, tests and a sample movie record.
+- Current Python source, tests and a synthetic sample movie record.
 - `data/processed/movies_clean.csv` and `movies_features.csv`.
 - Final 35-feature model artifacts, metrics and training manifest in `models/reduced`.
 - Analytical reports, error tables and charts in `reports`.
 - The final Tableau workbook and saved dashboard CSV sources.
-- Available collection metadata, coverage and duplicate reports under `data/raw`.
 
-The large timestamped TMDB response files are not committed. The small raw-directory
-reports describe the source data; they cannot replace the actual movie records.
+Original API responses are not committed, and no files under `data/raw` are included
+in review archives. Source-quality reports must also be untracked before any public
+release.
 
 ## Review saved results and run prediction
 
@@ -35,18 +35,18 @@ These commands use macOS/Linux executable paths. On Windows, use
 
 Once dependencies are installed, tests and saved-model prediction need neither
 network access nor a TMDB API key. The prediction reads the included processed
-history and saved revenue/blockbuster models. Outcomes present in the example
-record are discarded when building current-film model inputs.
+history and saved revenue/blockbuster models. The example is synthetic, and any
+outcomes present in it are discarded when building current-film model inputs.
 
 The final dashboard can be opened independently in Tableau:
 `dashboard/tableau/boxoffice_dashboard.twbx`.
 
 ## Reconstruct the complete pipeline
 
-To reproduce cleaning and training from the original snapshot, obtain the original
-raw-data files separately and place the timestamped `tmdb_movies_*.json` extracts
-under `data/raw`. A merged file alone is not enough for the default merge step.
-Then run from the repository root:
+To reproduce cleaning and training from the original snapshot, use an authorized
+local collection and place its timestamped `tmdb_movies_*.json` extracts under
+`data/raw`. These responses are not distributed with the project. A merged file
+alone is not enough for the default merge step. Then run from the repository root:
 
 ```bash
 MPLBACKEND=Agg .venv/bin/python -m src.run_pipeline
@@ -57,21 +57,17 @@ evaluates the final models, validates prediction/evaluation tables and generates
 EDA. It refreshes `data/processed`, `models/reduced` and analytical outputs in
 `reports`. The Tableau workbook and active dashboard CSVs are preserved.
 
-The existing local archive `dist/boxoffice_portfolio_submission.zip` can supply
-these extracts if provided separately. It is not part of the Git repository and is
-not presented here as an available public download. Before publishing a package,
-check that it contains only the intended public files and excludes internal notes
-and superseded experiments.
-
-If the complete local raw-data collection is available, an archive can be built
-with:
+Raw TMDB API responses and timestamped extracts remain local and are never included
+in the portfolio archive. A review archive containing code, processed analytical
+artifacts, saved models and the dashboard can be built with:
 
 ```bash
 .venv/bin/python scripts/build_portfolio_package.py
 ```
 
-The script checks ZIP integrity and includes SHA-256 file checksums. Its output is
-a separate delivery artifact rather than a file to commit to Git.
+The script checks ZIP integrity, verifies that no `data/raw` files are present and
+includes SHA-256 file checksums. Its output is a separate delivery artifact rather
+than a file to commit to Git.
 
 ## New collection and research comparisons
 
@@ -95,3 +91,15 @@ development-validation experiments use the included processed feature table:
 
 The final pipeline and prediction use the 35-feature model contract. There is no
 second full-feature pipeline option or duplicate CSV export layer.
+
+The later [revenue-model comparison](model_comparison.md) uses the same processed
+feature table and a separate pinned dependency file. Run it with:
+
+```bash
+.venv/bin/pip install -r requirements-comparison.txt
+.venv/bin/python scripts/compare_revenue_models.py
+```
+
+Its versioned summary, per-window scores, and input checksum are under
+`reports/model_comparison/`. This is an exploratory comparison; it does not
+replace the final saved artifacts or create a never-inspected test set.

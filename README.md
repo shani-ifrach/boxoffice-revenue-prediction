@@ -1,5 +1,7 @@
 # Box Office Revenue Prediction
 
+[![CI](https://github.com/shani-ifrach/boxoffice-revenue-prediction/actions/workflows/ci.yml/badge.svg)](https://github.com/shani-ifrach/boxoffice-revenue-prediction/actions/workflows/ci.yml)
+
 A portfolio project combining Python data analysis, machine learning and a Tableau
 dashboard. It estimates worldwide movie revenue and separately
 scores the likelihood of exceeding $400M and reported revenue exceeding budget.
@@ -20,7 +22,7 @@ by mean MAE across three expanding temporal validation windows. On the separate
 | RMSE | $156.0M | $237.4M |
 | R² | 0.519 | -0.113 |
 
-The model reduced MAE by **39.0%**. Errors are much smaller for films below $250M
+The model reduced MAE by **38.9%**. Errors are much smaller for films below $250M
 ($27.5M MAE) than for blockbusters above $400M ($380.2M MAE). This is a useful
 commercial-scale signal, with substantial limitations for exceptional hits.
 
@@ -34,6 +36,8 @@ coverage does not imply dependable coverage for every segment.
 
 See [final report](reports/final_report.md) for the analysis and
 [model card](docs/model_card.md) for evaluation details.
+An [exploratory revenue-model comparison](docs/model_comparison.md) documents later
+tests of additional model families and how to reproduce them.
 
 ## Tableau dashboard
 
@@ -85,30 +89,34 @@ python -m venv .venv
 ```
 
 The repository includes processed data in `data/processed`, the final trained
-models in `models/reduced`, and a sample movie record. The tests and offline
+models in `models/reduced`, and a fully synthetic sample movie record. The tests and offline
 prediction do not require a TMDB API key or the original raw extracts. These
 commands use the Python environment layout for macOS/Linux; on Windows the virtual
 environment's Python executable is `.venv\Scripts\python.exe`.
 
 Prediction returns revenue, an empirical interval, calibrated blockbuster
-probability and the saved classification threshold. Current-film outcomes in the
-sample record are discarded by the feature builder.
+probability and the saved classification threshold. The example contains no
+TMDB-sourced movie record, and any current-film outcomes are discarded by the
+feature builder.
 
 ## Reproduce the complete pipeline
 
-The original timestamped TMDB response files are not committed to the repository.
-To repeat the complete merge-to-model run, restore those extracts under `data/raw`
-from a separately supplied raw-data package, then run:
+The original timestamped TMDB response files are not committed or distributed.
+A complete merge-to-model reconstruction requires an authorized local collection.
+If those extracts are available locally, place them under `data/raw`, then run:
 
 ```bash
 MPLBACKEND=Agg .venv/bin/python -m src.run_pipeline
 ```
 
-This retrains the models and regenerates analytical outputs. The small metadata and
-duplicate/coverage reports in `data/raw` are documentation; they are not sufficient
-input for this run. A new API collection requires `TMDB_API_KEY` and may produce a
-different dataset and results. See [reproducibility guide](docs/reproducibility.md)
-for the distinction between saved-model review and full reconstruction.
+This retrains the models and regenerates analytical outputs. The portfolio review
+archive contains no `data/raw` files. A new API collection requires `TMDB_API_KEY`
+and may produce a different dataset and results. See the
+[reproducibility guide](docs/reproducibility.md) for the distinction between
+saved-model review and full reconstruction.
+
+Original TMDB API responses remain local and are excluded from Git and from the
+portfolio review archive.
 
 The final pipeline trains the **35-feature model** and writes model artifacts to
 `models/reduced`, processed data to `data/processed`, and analysis tables/charts to
@@ -132,7 +140,8 @@ For a live TMDB lookup, set `TMDB_API_KEY` and use `--tmdb-id` instead of
 - `src/data_quality.py`: financial data profiles and analytical output validation.
 - `src/feature_ablation.py`, `feature_stability.py`: development-only comparisons.
 - `docs`: architecture, contracts, reproducibility, tests and limitations.
-- [Decision log](notes/decision_log.md): reasons for the main data and modeling choices.
+- [Decision log](notes/decision_log.md): rationale for the main data, validation and
+  modeling choices.
 
 ## Limits
 
@@ -142,8 +151,12 @@ incomplete; marketing, release width and distribution economics are unavailable.
 Worldwide gross above budget is not accounting profit. Empirical intervals have no
 formal coverage guarantee under this temporal workflow.
 
-TMDB attribution: “This product uses the TMDB API but is not endorsed or certified
-by TMDB.”
+## Data source attribution
+
+[![The Movie Database (TMDB)](docs/assets/tmdb-logo.svg)](https://www.themoviedb.org)
+
+This product uses the TMDB API but is not endorsed or certified by TMDB. The logo
+above is an unmodified approved TMDB asset.
 
 ![Executive overview](dashboard/tableau/executive_overview.jpg)
 ![Model evaluation](dashboard/tableau/model_evaluation.jpg)

@@ -12,16 +12,16 @@ The canonical dataset contains 3,607 unique TMDB films released 2010–2024. Rev
 and blockbuster models use every revenue-valid row; profitability uses only 2,816
 rows with reported positive budget. Model families are selected on expanding
 validation windows 2016–2017, 2018–2019, and 2020–2021. The 618-row 2022–2024
-period is reserved for final evaluation in the main trainer. Earlier exploratory
+period is used for final evaluation in the main trainer. Earlier exploratory
 stability outputs also compared models on this period; no single-use or never-inspected
-holdout claim is made. Current stability comparisons exclude 2022–2024.
+test-set claim is made. Current stability comparisons exclude 2022–2024.
 
 ## Final revenue model
 
-Random Forest with 35 pre-release fields, selected by mean validation MAE. Holdout:
+Random Forest with 35 pre-release fields, selected by mean validation MAE. Evaluation set:
 MAE $57,521,066; RMSE $155,983,079; R² 0.5193. Development-median baseline MAE is
 $94,208,753. The nominal 90% empirical residual interval has $152,957,796 absolute half-width,
-90.29% empirical holdout coverage, and $185,513,987 average clipped width.
+90.29% empirical evaluation coverage, and $185,513,987 average clipped width.
 
 The interval uses pooled rolling-validation residuals from earlier models. It is
 not standard split-conformal and has no formal coverage guarantee. Legacy artifact
@@ -34,12 +34,12 @@ overflow, but its weak temporal performance is not hidden.
 ## Classifiers
 
 The profitability Logistic Regression is selected by temporal PR-AUC. On the
-budget-valid holdout (n=463): precision 75.3%, recall 61.9%, F1 68.0%, ROC-AUC
+budget-valid evaluation set (n=463): precision 75.3%, recall 61.9%, F1 68.0%, ROC-AUC
 71.3%, PR-AUC 81.0%, Brier 0.2079.
 
-The $400M Gradient Boosting classifier uses all 618 holdout rows. Its validation-only
+The $400M Gradient Boosting classifier uses all 618 evaluation rows. Its validation-only
 threshold is 0.065 after Platt calibration, chosen to retain at least 80% recall.
-Holdout precision is 59.6%, recall 81.0%, F1 68.7%, ROC-AUC 98.2%, PR-AUC 76.6%,
+Evaluation precision is 59.6%, recall 81.0%, F1 68.7%, ROC-AUC 98.2%, PR-AUC 76.6%,
 and Brier 0.0339 (TN 553, FP 23, FN 8, TP 34). Calibration curves and fit metrics reuse the calibrator-fitting population; they
 are not independent validation of calibration improvement. Final-test metrics use
 rows outside calibrator fitting. The displayed value is a calibrated

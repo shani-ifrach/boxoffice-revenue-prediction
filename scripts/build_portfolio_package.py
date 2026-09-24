@@ -1,4 +1,4 @@
-"""Create a complete local portfolio archive without source-control operations."""
+"""Create a review archive that excludes original TMDB API responses."""
 import argparse
 import hashlib
 import json
@@ -12,11 +12,19 @@ from zipfile import ZIP_DEFLATED, ZipFile
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 INCLUDED_DIRECTORIES = (
     "src", "tests", "docs", "notes", "scripts", "examples", "reports",
-    "data/raw", "data/processed", "models/reduced", "dashboard/tableau/data",
+    "data/processed", "models/reduced", "dashboard/tableau/data",
 )
 INCLUDED_FILES = (
-    "README.md", "requirements.txt", "pyproject.toml", "dashboard/README.md",
-    ".github/workflows/ci.yml", "dashboard/tableau/boxoffice_dashboard.twbx",
+    "README.md",
+    "requirements.txt",
+    "requirements-comparison.txt",
+    "pyproject.toml",
+    "dashboard/README.md",
+    ".github/workflows/ci.yml",
+    "dashboard/tableau/boxoffice_dashboard.twbx",
+    "dashboard/tableau/executive_overview.jpg",
+    "dashboard/tableau/model_evaluation.jpg",
+    "dashboard/tableau/movie_explorer.jpg",
 )
 
 
@@ -29,7 +37,7 @@ def checksum(path):
 
 
 def build_package(output_path):
-    """Include saved data/models and the final workbook; exclude generated experiments."""
+    """Include review artifacts while excluding raw API responses and extracts."""
     output_path = Path(output_path).resolve()
     sources = {PROJECT_ROOT / name for name in INCLUDED_FILES}
     for name in INCLUDED_DIRECTORIES:
@@ -41,13 +49,23 @@ def build_package(output_path):
             continue
         if "__pycache__" in relative.parts or source.name == ".DS_Store":
             continue
-        if relative.parts[:2] in (("reports", "full"), ("reports", "dashboard_data")):
+        if relative.parts[:2] in (
+            ("reports", "full"),
+            ("reports", "dashboard_data"),
+            ("reports", "experiments"),
+            ("src", "archive"),
+        ):
+            continue
+        if relative in {
+            Path("reports/baseline_20260914.md"),
+            Path("reports/submission_readiness_audit.md"),
+        }:
             continue
         if source.suffix in (".pyc", ".log") or source == output_path:
             continue
         files.append((source, relative))
     missing = [name for name in INCLUDED_FILES if not (PROJECT_ROOT / name).is_file()]
-    for name in ("data/raw", "data/processed", "models/reduced"):
+    for name in ("data/processed", "models/reduced"):
         if not any(relative.parts[:len(Path(name).parts)] == Path(name).parts for _, relative in files):
             missing.append(name)
     if missing:
@@ -55,6 +73,7 @@ def build_package(output_path):
     manifest = {
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
         "purpose": "local CV/interview portfolio review",
+        "raw_tmdb_responses_included": False,
         "python": ">=3.12,<3.15",
         "dashboard": "final Tableau workbook",
         "files": {str(relative): {"bytes": source.stat().st_size, "sha256": checksum(source)}
@@ -72,6 +91,8 @@ def build_package(output_path):
         with ZipFile(temporary_path) as archive:
             if archive.testzip() is not None:
                 raise ValueError("Portfolio ZIP integrity check failed")
+            if any("data/raw/" in name for name in archive.namelist()):
+                raise ValueError("Portfolio ZIP must not contain raw TMDB data")
         os.replace(temporary_path, output_path)
     finally:
         temporary_path.unlink(missing_ok=True)

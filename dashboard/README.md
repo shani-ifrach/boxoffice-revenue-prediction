@@ -36,4 +36,9 @@ produces cleaned data, model predictions and error tables directly in
 `data/processed`, `models/reduced` and `reports`. It preserves the delivered
 workbook and its active sources. See [data contract](../docs/tableau_data_contract.md).
 
-Attribution: “This product uses the TMDB API but is not endorsed or certified by TMDB.”
+## Data source attribution
+
+[![The Movie Database (TMDB)](../docs/assets/tmdb-logo.svg)](https://www.themoviedb.org)
+
+This product uses the TMDB API but is not endorsed or certified by TMDB. The logo
+above is an unmodified approved TMDB asset.
