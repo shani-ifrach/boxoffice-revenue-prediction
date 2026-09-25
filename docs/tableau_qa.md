@@ -13,4 +13,4 @@ predictions, evaluation metrics, classifier thresholds and interval widths were
 reproduced. Saved interval labels use “90% Forecast Range” and “90% interval”.
 No formal split-conformal claim is displayed in those labels.
 
-Published dashboard: [View on Tableau Public](https://public.tableau.com/shared/GT3J6GF8N?:display_count=n&:origin=viz_share_link).
+Published dashboard: [View on Tableau Public](https://public.tableau.com/app/profile/shani.ifrach4420/viz/BoxOfficeRevenuePrediction-AnalysisModelEvaluation/ExecutiveOverview).
