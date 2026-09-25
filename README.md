@@ -44,7 +44,7 @@ tests of additional model families and how to reproduce them.
 The dashboard contains **Executive Overview**, **Movie Explorer**, and
 **Revenue Model Evaluation**.
 
-**[View the interactive dashboard on Tableau Public](https://public.tableau.com/shared/HZFXZQRPF?:display_count=n&:origin=viz_share_link)**
+**[View the interactive dashboard on Tableau Public](https://public.tableau.com/app/profile/shani.ifrach4420/viz/BoxOfficeRevenuePrediction-AnalysisModelEvaluation/ExecutiveOverview)**
 
 Download and open the final workbook in Tableau:
 [boxoffice_dashboard.twbx](dashboard/tableau/boxoffice_dashboard.twbx).

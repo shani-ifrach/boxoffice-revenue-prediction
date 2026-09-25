@@ -3,7 +3,7 @@
 The dashboard presents financial patterns, individual-film comparisons and
 forecast performance using the project’s cleaned data and model outputs.
 
-[View the interactive dashboard on Tableau Public](https://public.tableau.com/shared/GT3J6GF8N?:display_count=n&:origin=viz_share_link).
+[View the interactive dashboard on Tableau Public](https://public.tableau.com/app/profile/shani.ifrach4420/viz/BoxOfficeRevenuePrediction-AnalysisModelEvaluation/ExecutiveOverview).
 
 For local review, open [boxoffice_dashboard.twbx](tableau/boxoffice_dashboard.twbx).
 This is the final portfolio artifact. Other workbook files are earlier versions.
