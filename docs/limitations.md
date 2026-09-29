@@ -1,6 +1,8 @@
 # Limitations
 
-- TMDB Discover is a popularity/vote-ordered sample, not a probability sample.
+- TMDB Discover combines popular, low-popularity, and high-vote-count ordered
+  slices. This reduces reliance on a single popularity-descending slice but remains
+  a non-random, non-probability sample.
 - Source records are current snapshots, not true point-in-time snapshots. Credits,
   ratings, and metadata may have changed after release.
 - Entity history is left-truncated at 2010, so early films appear to have less history.

@@ -1,4 +1,5 @@
 """Compare feature contracts on development-period temporal validation only."""
+
 import argparse
 from pathlib import Path
 
@@ -37,19 +38,35 @@ def run_stability(input_path, output_path):
 
     for train_end, validation_start, validation_end, split_name in TIME_SPLITS:
         train_data = movies[movies["release_year"] <= train_end].copy()
-        validation_data = movies[movies["release_year"].between(validation_start, validation_end)].copy()
+        validation_data = movies[
+            movies["release_year"].between(validation_start, validation_end)
+        ].copy()
         if train_data.empty or validation_data.empty:
             raise ValueError(f"Empty training/validation population for {split_name}.")
 
-        for model_name, features in (("full_model", FULL_PRE_RELEASE_FEATURES), ("reduced_model", REDUCED_PRE_RELEASE_FEATURES)):
+        for model_name, features in (
+            ("full_model", FULL_PRE_RELEASE_FEATURES),
+            ("reduced_model", REDUCED_PRE_RELEASE_FEATURES),
+        ):
             model = make_model(features)
-            model.fit(train_data[features], np.log1p(train_data["worldwide_revenue_usd"]))
-            validation_prediction = np.maximum(0, np.expm1(model.predict(validation_data[features])))
-            row = {"split": split_name, "train_end_year": train_end,
-                   "validation_years": f"{validation_start}-{validation_end}",
-                   "period": "validation", "model": model_name,
-                   "train_rows": len(train_data), "validation_rows": len(validation_data)}
-            row.update(score(validation_data["worldwide_revenue_usd"], validation_prediction))
+            model.fit(
+                train_data[features], np.log1p(train_data["worldwide_revenue_usd"])
+            )
+            validation_prediction = np.maximum(
+                0, np.expm1(model.predict(validation_data[features]))
+            )
+            row = {
+                "split": split_name,
+                "train_end_year": train_end,
+                "validation_years": f"{validation_start}-{validation_end}",
+                "period": "validation",
+                "model": model_name,
+                "train_rows": len(train_data),
+                "validation_rows": len(validation_data),
+            }
+            row.update(
+                score(validation_data["worldwide_revenue_usd"], validation_prediction)
+            )
             rows.append(row)
 
     results = pd.DataFrame(rows)
@@ -61,8 +78,14 @@ def run_stability(input_path, output_path):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--input-path", type=Path, default=Path("data/processed/movies_features.csv"))
-    parser.add_argument("--output-path", type=Path, default=Path("reports/feature_stability_results.csv"))
+    parser.add_argument(
+        "--input-path", type=Path, default=Path("data/processed/movies_features.csv")
+    )
+    parser.add_argument(
+        "--output-path",
+        type=Path,
+        default=Path("reports/feature_stability_results.csv"),
+    )
     args = parser.parse_args()
     run_stability(args.input_path, args.output_path)
 

@@ -1,8 +1,9 @@
 # Architecture
 
 ```text
-TMDB API (optional collection)
-  -> timestamped raw JSON
+TMDB API (optional three-strategy collection)
+  -> popular, low-popularity and high-vote-count Discover slices
+  -> timestamped raw JSON + per-strategy metadata
   -> merge by tmdb_id + coverage/duplicate reports
   -> cleaned movie table (nullable financial labels)
   -> shared strict-date feature builder
@@ -13,8 +14,11 @@ TMDB API (optional collection)
 Tableau dashboard <- saved analytical outputs
 ```
 
-Collection is separated from local reproduction. Some legacy extracts lack
-individual sampling metadata; the coverage report marks unknown strategies.
+Collection is separated from local reproduction. The default collector runs
+`popularity.desc`, `popularity.asc`, and `vote_count.desc`, then merges their
+overlap by `tmdb_id`. This broadens the ordered Discover slice but does not create a
+random or representative sample. Some legacy extracts lack individual sampling
+metadata; the coverage report marks unknown strategies.
 
 The final pipeline writes models to `models/reduced`, cleaned/features data to
 `data/processed`, and analysis to `reports`. There is one feature contract for final

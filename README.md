@@ -56,7 +56,9 @@ workbook and its active CSV sources are preserved when the pipeline runs.
 ## Workflow
 
 ```text
-TMDB extracts -> deduplication -> cleaning -> shared strict-date features
+TMDB discovery mix (popular + low-popularity + high-vote-count slices)
+              -> timestamped extracts -> deduplication by tmdb_id
+              -> cleaning -> shared strict-date features
               -> temporal model selection -> saved models -> evaluation + EDA
               -> validated analytical tables
 
@@ -89,15 +91,23 @@ python -m venv .venv
 ```
 
 The repository includes processed data in `data/processed`, the final trained
-models in `models/reduced`, and a fully synthetic sample movie record. The tests and offline
-prediction do not require a TMDB API key or the original raw extracts. These
-commands use the Python environment layout for macOS/Linux; on Windows the virtual
-environment's Python executable is `.venv\Scripts\python.exe`.
+models in `models/reduced`, and a fully synthetic sample movie record. The tests
+and offline prediction do not require a TMDB API key or the original raw extracts.
+These commands use the Python environment layout for macOS/Linux; on Windows the
+virtual environment's Python executable is `.venv\Scripts\python.exe`.
 
-Prediction returns revenue, an empirical interval, calibrated blockbuster
-probability and the saved classification threshold. The example contains no
-TMDB-sourced movie record, and any current-film outcomes are discarded by the
-feature builder.
+Prediction returns revenue, an empirical interval, calibrated blockbuster and
+profitability probabilities, and both saved classification thresholds. Here,
+profitability means reported worldwide revenue exceeding reported production
+budget; it is not accounting profit. The example contains no TMDB-sourced movie
+record, and any current-film outcomes are discarded by the feature builder.
+
+For development, install the formatter and verify the repository style with:
+
+```bash
+.venv/bin/pip install -r requirements-dev.txt
+.venv/bin/black --check src tests scripts
+```
 
 ## Reproduce the complete pipeline
 
@@ -117,6 +127,20 @@ saved-model review and full reconstruction.
 
 Original TMDB API responses remain local and are excluded from Git and from the
 portfolio review archive.
+
+The collector's default run matches the original sampling workflow: 15 Discover
+pages per year for 2010–2024 under `popularity.desc`, `popularity.asc`, and
+`vote_count.desc`. It writes one timestamped raw extract and metadata file per
+strategy, then merges overlaps by `tmdb_id`:
+
+```bash
+export TMDB_API_KEY="YOUR_REAL_KEY"
+.venv/bin/python -m src.collect_tmdb
+```
+
+This is a deliberately mixed, ordered sample rather than a random or representative
+sample. Repeat `--sort-by` to request a custom strategy mix, or pass it once for a
+single diagnostic slice.
 
 The final pipeline trains the **35-feature model** and writes model artifacts to
 `models/reduced`, processed data to `data/processed`, and analysis tables/charts to

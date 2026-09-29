@@ -6,6 +6,10 @@
 - Treat non-positive budget/revenue as unreported. Retain revenue-valid rows for
   regression and blockbuster modeling; require valid budget only for profitability.
 - Use a canonical strict-date feature builder shared by training and inference.
+- Preserve the original TMDB discovery mix as the collector default: 15 pages per
+  year for `popularity.desc`, `popularity.asc`, and `vote_count.desc`, followed by
+  deduplication on `tmdb_id`. This diversifies the ordered slices but is not a
+  probability sample.
 - Use primary genre for the production model to keep the categorical contract stable;
   exploded multi-genre data remains available for EDA. Revisit multi-hot encoding
   only through rolling validation, never the final evaluation period.

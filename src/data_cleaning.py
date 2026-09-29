@@ -6,6 +6,7 @@ TMDB zeros are converted to missing values because, in this source, zero commonl
 means that budget or revenue was not reported. The raw JSON remains the source of
 truth; this CSV is an explicit, reproducible modeling layer.
 """
+
 import json
 from pathlib import Path
 import pandas as pd
@@ -32,22 +33,36 @@ def flatten_movie(record):
     top_cast = credits.get("cast", [])[:10]
     cast = [person.get("name") for person in top_cast if person.get("name")]
     cast_ids = [str(person.get("id")) for person in top_cast if person.get("id")]
-    director_people = [person for person in credits.get("crew", []) if person.get("job") == "Director"]
+    director_people = [
+        person for person in credits.get("crew", []) if person.get("job") == "Director"
+    ]
     directors = [person.get("name") for person in director_people if person.get("name")]
-    director_ids = [str(person.get("id")) for person in director_people if person.get("id")]
+    director_ids = [
+        str(person.get("id")) for person in director_people if person.get("id")
+    ]
     collection = record.get("belongs_to_collection") or {}
     companies = record.get("production_companies", [])
     return {
-        "tmdb_id": record.get("id"), "title": record.get("title"),
-        "release_date": record.get("release_date"), "runtime_minutes": record.get("runtime"),
-        "original_language": record.get("original_language"), "budget_usd": record.get("budget"),
-        "worldwide_revenue_usd": record.get("revenue"), "popularity": record.get("popularity"),
-        "vote_average": record.get("vote_average"), "vote_count": record.get("vote_count"),
+        "tmdb_id": record.get("id"),
+        "title": record.get("title"),
+        "release_date": record.get("release_date"),
+        "runtime_minutes": record.get("runtime"),
+        "original_language": record.get("original_language"),
+        "budget_usd": record.get("budget"),
+        "worldwide_revenue_usd": record.get("revenue"),
+        "popularity": record.get("popularity"),
+        "vote_average": record.get("vote_average"),
+        "vote_count": record.get("vote_count"),
         "genres": "; ".join(g.get("name", "") for g in record.get("genres", [])),
-        "production_countries": "; ".join(c.get("iso_3166_1", "") for c in record.get("production_countries", [])),
+        "production_countries": "; ".join(
+            c.get("iso_3166_1", "") for c in record.get("production_countries", [])
+        ),
         "production_companies": "; ".join(c.get("name", "") for c in companies),
-        "production_company_ids": "; ".join(str(c.get("id")) for c in companies if c.get("id")),
-        "collection_id": collection.get("id"), "collection_name": collection.get("name"),
+        "production_company_ids": "; ".join(
+            str(c.get("id")) for c in companies if c.get("id")
+        ),
+        "collection_id": collection.get("id"),
+        "collection_name": collection.get("name"),
         "director": directors[0] if directors else None,
         "director_id": director_ids[0] if director_ids else None,
         "director_ids": "; ".join(director_ids),
@@ -56,7 +71,9 @@ def flatten_movie(record):
     }
 
 
-def clean_movie_data(raw_dir=Path("data/raw"), output_path=Path("data/processed/movies_clean.csv")):
+def clean_movie_data(
+    raw_dir=Path("data/raw"), output_path=Path("data/processed/movies_clean.csv")
+):
     """Build the cleaned movie table from the most recent raw JSON extract.
 
     The latest extract is selected so a newly merged or newly collected file becomes
@@ -76,24 +93,43 @@ def clean_movie_data(raw_dir=Path("data/raw"), output_path=Path("data/processed/
     if not raw_files:
         raise SystemExit("No raw TMDB extract found. Run src.collect_tmdb first.")
     extract_files = [path for path in raw_files if path.name != merged_path.name]
-    if extract_files and (not merged_path.exists() or max(path.stat().st_mtime for path in extract_files) > merged_path.stat().st_mtime):
+    if extract_files and (
+        not merged_path.exists()
+        or max(path.stat().st_mtime for path in extract_files)
+        > merged_path.stat().st_mtime
+    ):
         merge_raw_extracts(raw_dir, merged_path)
     source_path = merged_path if merged_path.exists() else raw_files[-1]
     records = json.loads(source_path.read_text(encoding="utf-8"))
     movies = pd.DataFrame([flatten_movie(record) for record in records])
-    movies = movies.dropna(subset=["tmdb_id"]).drop_duplicates("tmdb_id", keep="last").copy()
+    movies = (
+        movies.dropna(subset=["tmdb_id"]).drop_duplicates("tmdb_id", keep="last").copy()
+    )
     movies["release_date"] = pd.to_datetime(movies["release_date"], errors="coerce")
-    numeric_columns = ["runtime_minutes", "budget_usd", "worldwide_revenue_usd", "popularity", "vote_average", "vote_count"]
-    movies[numeric_columns] = movies[numeric_columns].apply(pd.to_numeric, errors="coerce")
+    numeric_columns = [
+        "runtime_minutes",
+        "budget_usd",
+        "worldwide_revenue_usd",
+        "popularity",
+        "vote_average",
+        "vote_count",
+    ]
+    movies[numeric_columns] = movies[numeric_columns].apply(
+        pd.to_numeric, errors="coerce"
+    )
 
     # Zero budgets/revenues mean "not reported" in TMDB more often than a genuine zero.
     # They are kept as missing so the modeling decision is explicit and auditable.
     movies.loc[movies["budget_usd"] <= 0, "budget_usd"] = pd.NA
     movies.loc[movies["worldwide_revenue_usd"] <= 0, "worldwide_revenue_usd"] = pd.NA
     movies.loc[movies["runtime_minutes"] <= 0, "runtime_minutes"] = pd.NA
-    movies = movies[movies["release_date"].notna() & movies["worldwide_revenue_usd"].notna()].copy()
+    movies = movies[
+        movies["release_date"].notna() & movies["worldwide_revenue_usd"].notna()
+    ].copy()
     movies["release_year"] = movies["release_date"].dt.year.astype("int64")
-    valid_profitability = movies["budget_usd"].notna() & movies["worldwide_revenue_usd"].notna()
+    valid_profitability = (
+        movies["budget_usd"].notna() & movies["worldwide_revenue_usd"].notna()
+    )
     movies["profitable"] = pd.Series(pd.NA, index=movies.index, dtype="Int64")
     movies.loc[valid_profitability, "profitable"] = (
         movies.loc[valid_profitability, "worldwide_revenue_usd"]

@@ -9,6 +9,7 @@ Install experiment dependencies and run all candidates:
     .venv/bin/pip install -r requirements-comparison.txt
     .venv/bin/python scripts/compare_revenue_models.py
 """
+
 import argparse
 import hashlib
 import json
@@ -48,14 +49,19 @@ from src.train_model import (
 
 def _dense_pipeline(estimator):
     """Use the production preprocessing, but dense encoding for histogram boosting."""
-    numeric = [column for column in PRE_RELEASE_FEATURES if column not in CATEGORICAL_FEATURES]
+    numeric = [
+        column for column in PRE_RELEASE_FEATURES if column not in CATEGORICAL_FEATURES
+    ]
     preprocessor = ColumnTransformer(
         [
             (
                 "numeric",
                 Pipeline(
                     [
-                        ("imputer", SimpleImputer(strategy="median", keep_empty_features=True)),
+                        (
+                            "imputer",
+                            SimpleImputer(strategy="median", keep_empty_features=True),
+                        ),
                         ("scale", StandardScaler()),
                     ]
                 ),
@@ -66,7 +72,10 @@ def _dense_pipeline(estimator):
                 Pipeline(
                     [
                         ("imputer", SimpleImputer(strategy="most_frequent")),
-                        ("onehot", OneHotEncoder(handle_unknown="ignore", sparse_output=False)),
+                        (
+                            "onehot",
+                            OneHotEncoder(handle_unknown="ignore", sparse_output=False),
+                        ),
                     ]
                 ),
                 CATEGORICAL_FEATURES,
@@ -231,7 +240,8 @@ def run(input_path: Path, output_dir: Path, requested_models=None) -> pd.DataFra
                 train[PRE_RELEASE_FEATURES], np.log1p(train.worldwide_revenue_usd)
             )
             prediction = _safe_dollars(
-                model.predict(validation[PRE_RELEASE_FEATURES]), train.worldwide_revenue_usd
+                model.predict(validation[PRE_RELEASE_FEATURES]),
+                train.worldwide_revenue_usd,
             )
             rows.append(
                 {
@@ -246,10 +256,12 @@ def run(input_path: Path, output_dir: Path, requested_models=None) -> pd.DataFra
             )
 
         final_model = factories[name]().fit(
-            development[PRE_RELEASE_FEATURES], np.log1p(development.worldwide_revenue_usd)
+            development[PRE_RELEASE_FEATURES],
+            np.log1p(development.worldwide_revenue_usd),
         )
         prediction = _safe_dollars(
-            final_model.predict(evaluation[PRE_RELEASE_FEATURES]), development.worldwide_revenue_usd
+            final_model.predict(evaluation[PRE_RELEASE_FEATURES]),
+            development.worldwide_revenue_usd,
         )
         rows.append(
             {
@@ -274,8 +286,15 @@ def run(input_path: Path, output_dir: Path, requested_models=None) -> pd.DataFra
             mean_rolling_r2=("R2", "mean"),
         )
         .merge(
-            results[results.split == "evaluation_not_used_for_selection"][["model", "MAE", "RMSE", "R2"]]
-            .rename(columns={"MAE": "evaluation_mae_usd", "RMSE": "evaluation_rmse_usd", "R2": "evaluation_r2"}),
+            results[results.split == "evaluation_not_used_for_selection"][
+                ["model", "MAE", "RMSE", "R2"]
+            ].rename(
+                columns={
+                    "MAE": "evaluation_mae_usd",
+                    "RMSE": "evaluation_rmse_usd",
+                    "R2": "evaluation_r2",
+                }
+            ),
             on="model",
             validate="one_to_one",
         )
@@ -293,13 +312,27 @@ def run(input_path: Path, output_dir: Path, requested_models=None) -> pd.DataFra
                 "estimator_parameters": {
                     name: {
                         key: repr(value)
-                        for key, value in factories[name]().named_steps["model"].get_params(deep=False).items()
+                        for key, value in factories[name]()
+                        .named_steps["model"]
+                        .get_params(deep=False)
+                        .items()
                     }
                     for name in requested
                 },
                 "packages": {
                     "python": platform.python_version(),
-                    **{name: version(name) for name in ("numpy", "pandas", "scikit-learn", "xgboost", "catboost", "lightgbm") if name not in missing},
+                    **{
+                        name: version(name)
+                        for name in (
+                            "numpy",
+                            "pandas",
+                            "scikit-learn",
+                            "xgboost",
+                            "catboost",
+                            "lightgbm",
+                        )
+                        if name not in missing
+                    },
                 },
                 "random_seed": RANDOM_SEED,
                 "features": PRE_RELEASE_FEATURES,
@@ -320,8 +353,12 @@ def run(input_path: Path, output_dir: Path, requested_models=None) -> pd.DataFra
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--input-path", type=Path, default=Path("data/processed/movies_features.csv"))
-    parser.add_argument("--output-dir", type=Path, default=Path("reports/model_comparison"))
+    parser.add_argument(
+        "--input-path", type=Path, default=Path("data/processed/movies_features.csv")
+    )
+    parser.add_argument(
+        "--output-dir", type=Path, default=Path("reports/model_comparison")
+    )
     parser.add_argument(
         "--models",
         nargs="+",

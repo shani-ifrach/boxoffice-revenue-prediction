@@ -3,5 +3,9 @@ name = "boxoffice-revenue-prediction"
 version = "2.0.0"
 requires-python = ">=3.12,<3.15"
 
+[tool.black]
+line-length = 88
+target-version = ["py312"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]

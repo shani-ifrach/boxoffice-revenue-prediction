@@ -74,8 +74,30 @@ than a file to commit to Git.
 New collection with `src.collect_tmdb` requires `TMDB_API_KEY` as an environment
 variable. Do not include the key in the repository or in an archive. Fresh API
 responses may differ from the saved 2026-09-04 snapshot and are not guaranteed to
-reproduce its published metrics. Some legacy extracts lack individual sampling
-metadata; unknown source strategies remain explicit in the coverage report.
+reproduce its published metrics.
+
+With no `--sort-by` argument, the collector reproduces the documented sampling
+workflow: for each year from 2010 through 2024 it requests 15 Discover pages in
+each of three orderings—`popularity.desc`, `popularity.asc`, and
+`vote_count.desc`. Each ordering is saved as a separate timestamped extract with
+metadata, and the extracts are then merged and deduplicated by `tmdb_id`:
+
+```bash
+export TMDB_API_KEY="YOUR_REAL_KEY"
+.venv/bin/python -m src.collect_tmdb
+```
+
+The command supports a custom mix by repeating `--sort-by`; a single occurrence
+collects only that one slice. The resulting sample is deliberately diversified but
+is not random or statistically representative. Some legacy extracts lack individual
+sampling metadata; unknown source strategies remain explicit in the coverage report.
+
+Historical provenance for the saved analytical snapshot remains recoverable from
+Git commit `a8ff31d`: its coverage report records six source extracts—three covering
+2010–2019 and three covering 2020–2024—with 13,212 source records, 10,336 unique
+TMDB IDs, and 2,876 IDs appearing in more than one extract. The contemporaneous
+collection runner documents the three orderings and 15 pages per year. The original
+response payloads themselves are intentionally not retained in the public project.
 
 Randomized estimators use seed 42. Final artifacts embed preprocessing and the
 ordered feature contract; the training manifest records package versions, split

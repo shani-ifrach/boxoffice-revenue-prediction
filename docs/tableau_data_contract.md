@@ -13,9 +13,10 @@ and evaluation populations, final-test years, finite numeric outputs, probabilit
 and correctly ordered intervals. It also checks that evaluation values match saved
 predictions. The same validator checks the delivered dashboard CSV relationships.
 
-The final workbook and `dashboard/tableau/data` contain the delivered dashboard
-snapshot and are preserved when the pipeline runs. Current saved metrics and
-predictions remain consistent with the dashboard delivery.
+The final workbook contains the delivered dashboard snapshot and is preserved when
+the pipeline runs. The review CSVs under `dashboard/tableau/data` mirror the current
+analysis outputs, including development-only feature-stability results. Current
+saved metrics and predictions remain consistent with the dashboard delivery.
 
 Prediction intervals use `prediction_lower_usd`, `predicted_revenue_usd` and
 `prediction_upper_usd`. Nominal 90% intervals come from empirical rolling-validation
